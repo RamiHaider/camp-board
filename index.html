@@ -664,7 +664,7 @@ sb.auth.onAuthStateChange((event, s) => {
     isAdmin = role==="admin"; canView = !!role;
     if (s && !canView) showMsg("#loginMsg","This account is signed in but has no access to the board. Ask the camp admin.","err");
     if (canView && !couldView && (location.hash==="#admin"||!location.hash)) location.hash="#map";
-    if (!s) { closeDrawer(); mode=null; editing=false; editLayout=null; location.hash="#request"; showMsg("#loginMsg",""); }
+    if (event==="SIGNED_OUT") { closeDrawer(); mode=null; editing=false; editLayout=null; location.hash="#request"; showMsg("#loginMsg",""); toast("Signed out"); }
     loaded=false; layout=null; stays=[]; settings=null;
     await loadAll(); subscribe(); render();
   }, 0);
