@@ -2,9 +2,10 @@
 
 create extension if not exists pgcrypto;
 
--- Who may run the board. Add an email here to make someone an admin.
-create table if not exists admins (
+-- Who may open the board. role 'admin' can change everything, 'viewer' can only look.
+create table if not exists members (
   email text primary key,
+  role text not null default 'admin' check (role in ('admin','viewer')),
   added_at timestamptz not null default now()
 );
 
@@ -48,23 +49,34 @@ create index if not exists stays_status_idx on stays (status);
 create index if not exists stays_bed_idx on stays (bed);
 
 -- ---------- security ----------
-alter table admins    enable row level security;
+alter table members   enable row level security;
 alter table settings  enable row level security;
 alter table companies enable row level security;
 alter table layout    enable row level security;
 alter table stays     enable row level security;
 
-create or replace function is_admin() returns boolean
+create or replace function my_role() returns text
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from admins where lower(email) = lower(coalesce(auth.jwt()->>'email','')));
+  select role from members where lower(email) = lower(coalesce(auth.jwt()->>'email','')) limit 1;
 $$;
+create or replace function is_admin() returns boolean
+language sql stable security definer set search_path = public as $$ select coalesce(my_role() = 'admin', false); $$;
+create or replace function is_member() returns boolean
+language sql stable security definer set search_path = public as $$ select my_role() is not null; $$;
+revoke all on function my_role() from public, anon;  grant execute on function my_role() to authenticated;
+revoke all on function is_member() from public, anon; grant execute on function is_member() to authenticated;
 
 -- admins: full access to everything
-drop policy if exists admin_all on admins;    create policy admin_all on admins    for all to authenticated using (is_admin()) with check (is_admin());
+drop policy if exists admin_all on members;   create policy admin_all on members   for all to authenticated using (is_admin()) with check (is_admin());
 drop policy if exists admin_all on settings;  create policy admin_all on settings  for all to authenticated using (is_admin()) with check (is_admin());
 drop policy if exists admin_all on companies; create policy admin_all on companies for all to authenticated using (is_admin()) with check (is_admin());
 drop policy if exists admin_all on layout;    create policy admin_all on layout    for all to authenticated using (is_admin()) with check (is_admin());
 drop policy if exists admin_all on stays;     create policy admin_all on stays     for all to authenticated using (is_admin()) with check (is_admin());
+
+-- viewers (any member) may read the board
+drop policy if exists member_read on stays;     create policy member_read on stays     for select to authenticated using (is_member());
+drop policy if exists member_read on layout;    create policy member_read on layout    for select to authenticated using (is_member());
+drop policy if exists member_read on settings;  create policy member_read on settings  for select to authenticated using (is_member());
 
 -- anyone: may read company names for the request form dropdown. Nothing else.
 drop policy if exists anon_read_companies on companies;
