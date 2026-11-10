@@ -106,3 +106,7 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   alter publication supabase_realtime add table layout;
 exception when duplicate_object then null; end $$;
+
+-- tighten grants flagged by the security advisor
+revoke execute on function is_admin() from anon, public;
+revoke execute on function rls_auto_enable() from anon, authenticated, public;
