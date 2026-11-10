@@ -136,6 +136,9 @@ th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-
 th{color:var(--muted);font-weight:500;font-size:12px}
 .tablewrap{overflow-x:auto}
 
+.people{display:flex;flex-direction:column;gap:10px}
+.person{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.person .ph{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .form{max-width:520px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:16px}
 .edit .room{gap:4px}
 .edit .room input{padding:4px 6px;font-size:12.5px}
@@ -201,14 +204,10 @@ th{color:var(--muted);font-weight:500;font-size:12px}
       <section class="view" id="view-request" hidden>
         <form class="form" id="reqForm">
           <h2>Request a bed</h2>
-          <p class="note">Fill this in and the camp admin will assign a room. You will not pick the room yourself.</p>
-          <div class="field"><label for="rName">Full name</label><input id="rName" required autocomplete="name" maxlength="120"></div>
+          <p class="note">Fill this in and the camp admin will assign rooms. You will not pick the room yourself. Sending a crew? Add each person below.</p>
           <div class="field"><label for="rCompany">Company / crew</label><input id="rCompany" list="companyList" required autocomplete="off" maxlength="80" placeholder="Pick one or type a new one"><datalist id="companyList"></datalist></div>
-          <div class="grid2">
-            <div class="field"><label for="rArrive">Arrival</label><input type="date" id="rArrive" required></div>
-            <div class="field"><label for="rDepart">Departure</label><input type="date" id="rDepart" required></div>
-          </div>
-          <div class="field"><label for="rNotes">Notes (role, preferences, anything useful)</label><textarea id="rNotes" maxlength="500"></textarea></div>
+          <div id="rPeople" class="people"></div>
+          <div><button type="button" class="btn sm" id="rAdd">+ Add another person</button></div>
           <div class="actions"><button class="btn primary" type="submit" id="rSend">Send request</button></div>
           <div id="reqMsg" class="msg" hidden></div>
         </form>
@@ -255,7 +254,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let session = null, role = null, isAdmin = false, canView = false;
 let layout = null, stays = [], companies = [], settings = null;
 let mode = null, selectedBed = null, drawerKind = null;
-let editing = false, editLayout = null;
+let editing = false, editLayout = null, addDefaults = null;
 let filter = {from:"", to:""};
 let loaded = false;
 
@@ -520,9 +519,21 @@ function renderDrawer(){
       ${companyPicker("", "")}
       <div class="grid2"><div class="field"><label for="pArrive">Arrival</label><input type="date" id="pArrive" value="${t}"></div><div class="field"><label for="pDepart">Departure</label><input type="date" id="pDepart" value="${addDays(t,14)}"></div></div>
       <div class="field"><label for="pNotes">Notes</label><textarea id="pNotes"></textarea></div>
-      <div class="actions"><button class="btn primary" id="pSave">${selectedBed?"Assign to this bed":"Add and pick a bed"}</button></div><div id="dMsg" class="msg err" hidden></div>`;
+      <div class="actions"><button class="btn primary" id="pSave">${selectedBed?"Assign to this bed":"Add and pick a bed"}</button>${selectedBed?"":`<button class="btn" id="pMore" title="Saves this person to Requests waiting and keeps company and dates for the next one">Save and add another</button>`}</div><div id="dMsg" class="msg err" hidden></div>`;
     wireCompanyPicker(d);
-    d.querySelector("#dClose").onclick=closeDrawer;
+    if (addDefaults){ d.querySelector("#pArrive").value=addDefaults.arrive; d.querySelector("#pDepart").value=addDefaults.depart; const sel=d.querySelector("#pCompany"); if([...sel.options].some(o=>o.value===addDefaults.company)) sel.value=addDefaults.company; }
+    d.querySelector("#dClose").onclick=()=>{ addDefaults=null; closeDrawer(); };
+    const more=d.querySelector("#pMore"); if (more) more.onclick=async()=>{
+      try{
+        const name=d.querySelector("#pName").value.trim(); if(!name) throw new Error("Name is required.");
+        const arrive=d.querySelector("#pArrive").value, depart=d.querySelector("#pDepart").value;
+        if(!arrive||!depart||depart<arrive) throw new Error("Check the dates. Departure must be on or after arrival.");
+        const company=await resolveCompany(d);
+        const notes=d.querySelector("#pNotes").value.trim();
+        await db.insertStay({name,company,arrive,depart,notes,bed:null,status:"requested"});
+        addDefaults={company,arrive,depart}; toast(`${name} added to Requests waiting`); render(); d.querySelector("#pName").focus();
+      }catch(e){ const m=d.querySelector("#dMsg"); m.hidden=false; m.textContent=e.message||"Could not save. Try again."; }
+    };
     d.querySelector("#pSave").onclick=async()=>{
       try{
         const name=d.querySelector("#pName").value.trim(); if(!name) throw new Error("Name is required.");
@@ -625,16 +636,41 @@ $("#fFrom").onchange=$("#fTo").onchange=()=>{ filter={from:$("#fFrom").value,to:
 $("#fClear").onclick=()=>{ filter={from:"",to:""}; $("#fFrom").value=""; $("#fTo").value=""; render(); };
 
 /* ---- request form (anyone) ---- */
+function personBlock(i, d){
+  return `<div class="person" data-i="${i}">
+    <div class="ph"><span>Person ${i+1}</span>${i>0?`<button type="button" class="btn sm" data-rm="${i}">Remove</button>`:""}</div>
+    <div class="field"><label>Full name</label><input class="pName" required autocomplete="off" maxlength="120" value="${esc(d.name||"")}"></div>
+    <div class="grid2"><div class="field"><label>Arrival</label><input type="date" class="pArrive" required value="${d.arrive}"></div><div class="field"><label>Departure</label><input type="date" class="pDepart" required value="${d.depart}"></div></div>
+    <div class="field"><label>Notes (role, preferences, anything useful)</label><input class="pNotes" maxlength="500" value="${esc(d.notes||"")}"></div>
+  </div>`;
+}
+function readPeople(){
+  return [...document.querySelectorAll("#rPeople .person")].map(el=>({name:el.querySelector(".pName").value.trim(), arrive:el.querySelector(".pArrive").value, depart:el.querySelector(".pDepart").value, notes:el.querySelector(".pNotes").value.trim()}));
+}
+function renderPeopleForm(list){
+  const host=$("#rPeople"); host.innerHTML = list.map((d,i)=>personBlock(i,d)).join("");
+  host.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ const l=readPeople(); l.splice(Number(b.dataset.rm),1); renderPeopleForm(l); });
+}
+function resetPeopleForm(){ renderPeopleForm([{name:"",arrive:today(),depart:addDays(today(),14),notes:""}]); }
+$("#rAdd").onclick=()=>{ const l=readPeople(); const last=l[l.length-1]||{arrive:today(),depart:addDays(today(),14)}; l.push({name:"",arrive:last.arrive,depart:last.depart,notes:""}); renderPeopleForm(l); const inputs=document.querySelectorAll("#rPeople .pName"); inputs[inputs.length-1].focus(); };
 $("#reqForm").onsubmit=async e=>{
   e.preventDefault();
   const btn=$("#rSend"); btn.disabled=true;
   try{
-    const name=$("#rName").value.trim(), company=$("#rCompany").value.trim(), arrive=$("#rArrive").value, depart=$("#rDepart").value, notes=$("#rNotes").value.trim();
-    if(depart<arrive) throw new Error("Departure must be on or after arrival.");
-    const {error} = await sb.rpc("submit_request",{p_name:name,p_company:company,p_arrive:arrive,p_depart:depart,p_notes:notes});
-    if (error) throw new Error(error.message);
-    showMsg("#reqMsg", `Request sent for ${name}, ${fmt(arrive)} to ${fmt(depart)}. The camp admin will assign a bed.`, "ok");
-    e.target.reset(); $("#rArrive").value=today(); $("#rDepart").value=addDays(today(),14);
+    const company=$("#rCompany").value.trim(); const people=readPeople();
+    if(!company) throw new Error("Company is required.");
+    for (const [i,p] of people.entries()){
+      if(p.name.length<2) throw new Error(`Person ${i+1}: name is required.`);
+      if(!p.arrive||!p.depart||p.depart<p.arrive) throw new Error(`Person ${i+1}: departure must be on or after arrival.`);
+    }
+    const sent=[];
+    for (const p of people){
+      const {error} = await sb.rpc("submit_request",{p_name:p.name,p_company:company,p_arrive:p.arrive,p_depart:p.depart,p_notes:p.notes});
+      if (error) throw new Error(`${p.name}: ${error.message}${sent.length?` (already sent: ${sent.join(", ")})`:""}`);
+      sent.push(p.name);
+    }
+    showMsg("#reqMsg", sent.length===1 ? `Request sent for ${sent[0]}. The camp admin will assign a bed.` : `${sent.length} requests sent for ${company}: ${sent.join(", ")}. The camp admin will assign beds.`, "ok");
+    $("#rCompany").value=""; resetPeopleForm();
     loadAll();
   }catch(err){ showMsg("#reqMsg", err.message||"Could not send. Try again.", "err"); }
   finally{ btn.disabled=false; }
@@ -675,7 +711,7 @@ sb.auth.onAuthStateChange((event, s) => {
 });
 
 /* ---- boot ---- */
-const t0=today(); $("#rArrive").value=t0; $("#rDepart").value=addDays(t0,14);
+resetPeopleForm();
 if (SUPABASE_URL.startsWith("__")) setStatus("This page is not connected to a database yet.", "err");
 render();
 })();
