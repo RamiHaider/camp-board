@@ -238,8 +238,7 @@ th{color:var(--muted);font-weight:500;font-size:12px}
           <p class="note">What requesters can pick from. A company typed under "Other" stays on that request only until you add it here or assign that person to a bed.</p>
           <div class="list" id="companyRows"></div>
           <h3>Add a company</h3>
-          <div class="field"><label for="cName">Name</label><input id="cName" maxlength="80"></div>
-          <div class="field"><label>Color</label><div class="swatches" id="cSwatches"></div></div>
+          <div class="field"><label for="cName">Name</label><input id="cName" maxlength="80" placeholder="A color is assigned automatically"></div>
           <div class="actions"><button class="btn primary" id="cAdd">Add</button></div>
           <div id="companyMsg" class="msg" hidden></div>
         </div>
@@ -263,6 +262,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const PALETTE = ["#2e7bd6","#d6632e","#8a3fc9","#c22f6a","#1f9ea3","#b58a00","#5a8f29","#d04b9a","#4d6bd4","#8c6a3f"];
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const nextColor = () => PALETTE.find(c => !companies.some(x => x.color.toLowerCase()===c)) || PALETTE[companies.length % PALETTE.length];
 let session = null, role = null, isAdmin = false, canView = false;
 let layout = null, stays = [], companies = [], settings = null;
 let mode = null, selectedBed = null, drawerKind = null;
@@ -335,7 +335,7 @@ const db = {
   async updateStay(id,patch){ const {error} = await sb.from("stays").update(patch).eq("id",id); if(error) throw error; await loadAll(); },
   async deleteStay(id){ const {error} = await sb.from("stays").delete().eq("id",id); if(error) throw error; await loadAll(); },
   async saveLayout(sections){ const {error} = await sb.from("layout").upsert({id:"main",sections,updated_at:new Date().toISOString()}); if(error) throw error; await loadAll(); },
-  async addCompany(name,color){ const {error} = await sb.from("companies").insert({name,color}); if(error && error.code!=="23505") throw error; await loadAll(); },
+  async addCompany(name,color){ const {error} = await sb.from("companies").insert({name,color:color||nextColor()}); if(error && error.code!=="23505") throw error; await loadAll(); },
   async deleteCompany(id){ const {error} = await sb.from("companies").delete().eq("id",id); if(error) throw error; await loadAll(); },
 };
 
@@ -497,9 +497,8 @@ function renderCompanyPanel(){
   const inUse = name => stays.filter(s=>(s.status==="assigned"||s.status==="requested") && s.company.toLowerCase()===name.toLowerCase()).length;
   $("#companyRows").innerHTML = companies.length ? companies.map(c=>`<div class="item" style="border-left-color:${esc(c.color)}"><div class="who"><b>${esc(c.name)}</b><small>${inUse(c.name)} active</small></div><button class="btn sm danger" data-delco="${c.id}">Remove</button></div>`).join("") : `<div class="empty">No companies yet.</div>`;
   $("#companyRows").querySelectorAll("[data-delco]").forEach(b=>b.onclick=async()=>{ const c=companies.find(x=>x.id===b.dataset.delco); if(!b.dataset.sure){ b.dataset.sure="1"; b.textContent="Confirm"; return; } try{ await db.deleteCompany(c.id); toast(`${c.name} removed from the dropdown`); }catch(e){ showMsg("#companyMsg",e.message,"err"); } });
-  if (!$("#cSwatches").children.length){ $("#cSwatches").innerHTML = PALETTE.map((c,i)=>`<button type="button" class="sw" style="background:${c}" data-c="${c}" aria-label="${c}" aria-pressed="${i===0}"></button>`).join(""); $("#cSwatches").querySelectorAll(".sw").forEach(b=>b.onclick=()=>{ $("#cSwatches").querySelectorAll(".sw").forEach(x=>x.setAttribute("aria-pressed","false")); b.setAttribute("aria-pressed","true"); }); }
 }
-$("#cAdd").onclick=async()=>{ const name=$("#cName").value.trim(); if(!name) return showMsg("#companyMsg","Give the company a name.","err"); const color=$("#cSwatches").querySelector(".sw[aria-pressed='true']")?.dataset.c||PALETTE[0]; try{ await db.addCompany(name,color); $("#cName").value=""; showMsg("#companyMsg",`${name} added.`,"ok"); }catch(e){ showMsg("#companyMsg",e.message,"err"); } };
+$("#cAdd").onclick=async()=>{ const name=$("#cName").value.trim(); if(!name) return showMsg("#companyMsg","Give the company a name.","err"); try{ await db.addCompany(name); $("#cName").value=""; showMsg("#companyMsg",`${name} added.`,"ok"); }catch(e){ showMsg("#companyMsg",e.message,"err"); } };
 function renderAdminPanel(){
   renderCompanyPanel();
   $("#loginForm").hidden = canView;
@@ -514,7 +513,7 @@ function closeDrawer(){ selectedBed=null; drawerKind=null; $("#drawer").hidden=t
 function companyPicker(selName, selColor){
   const opts = companies.map(c=>`<option value="${esc(c.name)}" ${c.name===selName?"selected":""}>${esc(c.name)}</option>`).join("");
   return `<div class="field"><label for="pCompany">Company</label><select id="pCompany"><option value="">— choose —</option>${opts}<option value="__new">+ New company…</option></select></div>
-  <div id="newCo" hidden style="display:flex;flex-direction:column;gap:8px"><div class="field"><label for="pCoName">New company name</label><input id="pCoName"></div><div class="field"><label>Color</label><div class="swatches">${PALETTE.map(c=>`<button type="button" class="sw" style="background:${c}" data-c="${c}" aria-label="${c}" aria-pressed="${c===selColor}"></button>`).join("")}</div></div></div>`;
+  <div id="newCo" hidden><div class="field"><label for="pCoName">New company name</label><input id="pCoName" placeholder="A color is assigned automatically"></div></div>`;
 }
 function wireCompanyPicker(root){
   const sel=root.querySelector("#pCompany"), box=root.querySelector("#newCo");
@@ -525,15 +524,14 @@ async function resolveCompany(root){
   const sel=root.querySelector("#pCompany");
   if (sel.value==="__new"){
     const name=root.querySelector("#pCoName").value.trim(); if(!name) throw new Error("Give the new company a name.");
-    const color=root.querySelector(".sw[aria-pressed='true']")?.dataset.c || PALETTE[companies.length%PALETTE.length];
-    await ensureCompany(name, color); return name;
+    await ensureCompany(name); return name;
   }
   if (!sel.value) throw new Error("Choose a company.");
   return sel.value;
 }
 async function ensureCompany(name, color){
   if (companies.some(c=>c.name.toLowerCase()===name.toLowerCase())) return;
-  await db.addCompany(name, color || PALETTE[companies.length%PALETTE.length]);
+  await db.addCompany(name, color);
 }
 
 function renderDrawer(){

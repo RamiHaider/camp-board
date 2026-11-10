@@ -11,7 +11,7 @@ Live: https://mgmcamp.com · Database: Supabase project `camp-board` · Hosting:
 ## Company list is admin-gated (decided 2026-11-10)
 Requesters pick a company from a dropdown or type a new one under "Other". A typed company is stored **on that request only** and never appears in the public dropdown. Reason: anything a random requester types would otherwise be shown to every other requester, and someone could put something offensive there. Only admins add or remove dropdown entries (Admin tab → Companies). When an admin assigns a request whose company is not in the list, the company is added to the list at that point, because an admin is vouching for it.
 
-Seeded 2026-11-10 from the MGM `Project Invoicing/2026` vendor folders: Maple Gold Mines, Forage Spektra, RJLL, Explo-Logik, Major Drilling, FTE Drilling, Laurentia. Labs (AGAT, ALS) left out, they do not stay at camp.
+Seeded 2026-11-10 from the MGM `Project Invoicing/2026` vendor folders: Maple Gold Mines, Forage Spektra, RJLL, Explo-Logik, Major Drilling, FTE Drilling (Forages Technic-Eau), Laurentia Exploration. Colors: the seven seeded ones are fixed; a new company gets the next unused palette color automatically. Labs (AGAT, ALS) left out, they do not stay at camp.
 
 ## Notifications (planned)
 - Requester gives an email on the form; it is stored per request (`stays.requester_email`).
