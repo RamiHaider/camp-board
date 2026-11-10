@@ -649,18 +649,25 @@ $("#lReset").onclick=async()=>{
   const {error} = await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname+"#admin"});
   showMsg("#loginMsg", error?error.message:"Check your email for a reset link.", error?"err":"ok");
 };
-$("#btnLogout").onclick=()=>sb.auth.signOut();
-sb.auth.onAuthStateChange(async (event, s) => {
+$("#btnLogout").onclick=async()=>{ const b=$("#btnLogout"); b.disabled=true; try{ const {error}=await sb.auth.signOut({scope:"local"}); if(error) toast(error.message); } finally{ b.disabled=false; } };
+// Never await Supabase calls inside this callback (it deadlocks the auth lock). Defer the work.
+let authSeq = 0;
+sb.auth.onAuthStateChange((event, s) => {
   session = s;
-  if (event==="PASSWORD_RECOVERY"){ const np=prompt("Choose a new password (8+ characters):"); if(np){ const {error}=await sb.auth.updateUser({password:np}); toast(error?error.message:"Password updated"); } }
-  const couldView = canView;
-  if (s){ const {data} = await sb.rpc("my_role"); role = data||null; }
-  else role = null;
-  isAdmin = role==="admin"; canView = !!role;
-  if (s && !canView) showMsg("#loginMsg","This account is signed in but has no access to the board. Ask the camp admin.","err");
-  if (canView && !couldView && (location.hash==="#admin"||!location.hash)) location.hash="#map";
-  loaded=false; layout=null; stays=[];
-  await loadAll(); subscribe(); render();
+  const seq = ++authSeq;
+  setTimeout(async () => {
+    if (seq !== authSeq) return;
+    if (event==="PASSWORD_RECOVERY"){ const np=prompt("Choose a new password (8+ characters):"); if(np){ const {error}=await sb.auth.updateUser({password:np}); toast(error?error.message:"Password updated"); } }
+    const couldView = canView;
+    if (s){ const {data} = await sb.rpc("my_role"); role = data||null; }
+    else role = null;
+    isAdmin = role==="admin"; canView = !!role;
+    if (s && !canView) showMsg("#loginMsg","This account is signed in but has no access to the board. Ask the camp admin.","err");
+    if (canView && !couldView && (location.hash==="#admin"||!location.hash)) location.hash="#map";
+    if (!s) { closeDrawer(); mode=null; editing=false; editLayout=null; location.hash="#request"; showMsg("#loginMsg",""); }
+    loaded=false; layout=null; stays=[]; settings=null;
+    await loadAll(); subscribe(); render();
+  }, 0);
 });
 
 /* ---- boot ---- */
