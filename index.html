@@ -513,7 +513,7 @@ function renderAdminPanel(){
 function closeDrawer(){ selectedBed=null; drawerKind=null; $("#drawer").hidden=true; $("#main").classList.remove("has-drawer"); document.querySelectorAll(".bed.selected").forEach(b=>b.classList.remove("selected")); }
 function companyPicker(selName, selColor){
   const opts = companies.map(c=>`<option value="${esc(c.name)}" ${c.name===selName?"selected":""}>${esc(c.name)}</option>`).join("");
-  return `<div class="field"><label for="pCompany">Company / crew</label><select id="pCompany"><option value="">— choose —</option>${opts}<option value="__new">+ New company…</option></select></div>
+  return `<div class="field"><label for="pCompany">Company</label><select id="pCompany"><option value="">— choose —</option>${opts}<option value="__new">+ New company…</option></select></div>
   <div id="newCo" hidden style="display:flex;flex-direction:column;gap:8px"><div class="field"><label for="pCoName">New company name</label><input id="pCoName"></div><div class="field"><label>Color</label><div class="swatches">${PALETTE.map(c=>`<button type="button" class="sw" style="background:${c}" data-c="${c}" aria-label="${c}" aria-pressed="${c===selColor}"></button>`).join("")}</div></div></div>`;
 }
 function wireCompanyPicker(root){
