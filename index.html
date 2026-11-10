@@ -248,7 +248,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const PALETTE = ["#2e7bd6","#d6632e","#8a3fc9","#c22f6a","#1f9ea3","#b58a00","#5a8f29","#d04b9a","#4d6bd4","#8c6a3f"];
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-let session = null, isAdmin = false;
+let session = null, role = null, isAdmin = false, canView = false;
 let layout = null, stays = [], companies = [], settings = null;
 let mode = null, selectedBed = null, drawerKind = null;
 let editing = false, editLayout = null;
@@ -287,7 +287,7 @@ const allBeds = () => { const out=[]; (layout?.sections||[]).forEach(s=>s.rooms.
 
 /* ---- data ---- */
 async function loadAll(){
-  if (!isAdmin){ const {data} = await sb.from("companies").select("name,color").order("name"); companies = data||[]; renderCompanyList(); return; }
+  if (!canView){ const {data} = await sb.from("companies").select("name,color").order("name"); companies = data||[]; renderCompanyList(); return; }
   const [L, S, C, T] = await Promise.all([
     sb.from("layout").select("*").eq("id","main").maybeSingle(),
     sb.from("stays").select("*"),
@@ -305,7 +305,7 @@ let channel = null, pollTimer = null;
 function subscribe(){
   if (channel) { sb.removeChannel(channel); channel=null; }
   clearInterval(pollTimer);
-  if (!isAdmin) return;
+  if (!canView) return;
   const refetch = () => { clearTimeout(subscribe.t); subscribe.t = setTimeout(loadAll, 150); };
   channel = sb.channel("camp")
     .on("postgres_changes",{event:"*",schema:"public",table:"stays"}, refetch)
@@ -327,12 +327,13 @@ const db = {
 const VIEWS = ["map","people","request","history","admin"];
 function route(){
   const h = location.hash.replace("#","");
-  let v = VIEWS.includes(h) ? h : (isAdmin ? "map" : "request");
-  if (!isAdmin && !["request","admin"].includes(v)) v = "request";
+  let v = VIEWS.includes(h) ? h : (canView ? "map" : "request");
+  if (!canView && !["request","admin"].includes(v)) v = "request";
   VIEWS.forEach(x => { $("#view-"+x).hidden = x!==v; });
   document.querySelectorAll("#nav a").forEach(a => a.dataset.view===v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
-  document.querySelectorAll(".adminonly").forEach(a => a.hidden = !isAdmin);
-  $("#adminLink").textContent = isAdmin ? "Admin" : "Admin sign in";
+  document.querySelectorAll(".adminonly").forEach(a => a.hidden = !canView);
+  $("#adminLink").textContent = canView ? (isAdmin ? "Admin" : "Viewer") : "Sign in";
+  $("#btnAddPerson").hidden = $("#btnEditLayout").hidden = !isAdmin;
   $("#setup").hidden = !(isAdmin && loaded && !layout && v==="map");
   if (v!=="map") closeDrawer();
 }
@@ -346,8 +347,8 @@ const showMsg = (sel, text, cls) => { const m=$(sel); m.hidden=!text; m.textCont
 function render(){
   route();
   renderCompanyList(); renderAdminPanel();
-  if (!isAdmin || !loaded) return;
-  if (!layout){ renderPeople(); return; }
+  if (!canView || !loaded) return;
+  if (!layout){ renderPeople(); if(!isAdmin) setStatus("The camp layout has not been created yet."); return; }
   renderStats(); renderMap(); renderPeople(); renderHistory(); renderDrawer();
   const pend = stays.filter(s=>s.status==="requested").length;
   $("#pendBadge").hidden = !pend; $("#pendBadge").textContent = pend;
@@ -455,8 +456,8 @@ function renderPeople(){
   const inCamp = assigned.filter(s=>s.arrive<=t).sort((a,b)=>a.depart<b.depart?-1:1);
   const card = (title, list, fn, emptyText) => `<div class="card"><h3>${title} <span class="num">(${list.length})</span></h3><div class="list">${list.length?list.map(fn).join(""):`<div class="empty">${emptyText}</div>`}</div></div>`;
   $("#peopleCols").innerHTML =
-    card("Requests waiting", pending, s=>itemRow(s, `<button class="btn sm primary" data-assign="${s.id}">Assign</button><button class="btn sm" data-decline="${s.id}" title="Decline">×</button>`), "No open requests.") +
-    card("Leaving in the next 7 days", leaving, s=>itemRow(s, `<button class="btn sm" data-checkout="${s.id}">Check out</button>`), "Nobody leaving this week.") +
+    card("Requests waiting", pending, s=>itemRow(s, isAdmin?`<button class="btn sm primary" data-assign="${s.id}">Assign</button><button class="btn sm" data-decline="${s.id}" title="Decline">×</button>`:""), "No open requests.") +
+    card("Leaving in the next 7 days", leaving, s=>itemRow(s, isAdmin?`<button class="btn sm" data-checkout="${s.id}">Check out</button>`:""), "Nobody leaving this week.") +
     card("Arriving in the next 2 days", arriving, s=>itemRow(s), "Nobody arriving.") +
     card("Everyone in camp", inCamp, s=>itemRow(s, `<button class="btn sm" data-open="${s.id}">Open</button>`), "Camp is empty.");
   const host=$("#peopleCols");
@@ -470,10 +471,10 @@ function renderHistory(){
   $("#histBody").innerHTML = rows.length ? rows.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.company)}</td><td>${s.bed?esc(bedLabel(s.bed)):"<span class='note'>declined</span>"}</td><td>${fmt(s.arrive)}</td><td>${fmt(s.depart)}</td><td>${fmt(s.closed_at)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty">Nothing checked out yet.</td></tr>`;
 }
 function renderAdminPanel(){
-  $("#loginForm").hidden = isAdmin;
-  $("#adminPanel").hidden = !isAdmin;
-  if (isAdmin){
-    $("#whoami").textContent = `Signed in as ${session?.user?.email||""}.`;
+  $("#loginForm").hidden = canView;
+  $("#adminPanel").hidden = !canView;
+  if (canView){
+    $("#whoami").textContent = `Signed in as ${session?.user?.email||""} (${isAdmin?"admin, can change the board":"viewer, read only"}).`;
   }
 }
 
@@ -542,10 +543,10 @@ function renderDrawer(){
   const person = now || next;
   if (!person){
     d.innerHTML = `<div class="hd"><h2>${esc(bedLabel(key))}</h2><button class="btn sm" id="dClose">Close</button></div><p class="note">Free bed.</p>
-      <div class="actions"><button class="btn primary" id="dPut">Put someone here</button></div>
-      ${stays.some(s=>s.status==="requested")?`<h3>Assign a waiting request</h3><div class="list">${stays.filter(s=>s.status==="requested").map(s=>itemRow(s,`<button class="btn sm primary" data-assignhere="${s.id}">Here</button>`)).join("")}</div>`:""}`;
+      ${isAdmin?`<div class="actions"><button class="btn primary" id="dPut">Put someone here</button></div>`:""}
+      ${isAdmin && stays.some(s=>s.status==="requested")?`<h3>Assign a waiting request</h3><div class="list">${stays.filter(s=>s.status==="requested").map(s=>itemRow(s,`<button class="btn sm primary" data-assignhere="${s.id}">Here</button>`)).join("")}</div>`:""}`;
     d.querySelector("#dClose").onclick=closeDrawer;
-    d.querySelector("#dPut").onclick=()=>{ drawerKind="add"; render(); };
+    if (isAdmin) d.querySelector("#dPut").onclick=()=>{ drawerKind="add"; render(); };
     d.querySelectorAll("[data-assignhere]").forEach(b=>b.onclick=()=>assignToBed(b.dataset.assignhere, key));
     return;
   }
@@ -555,13 +556,14 @@ function renderDrawer(){
     <div><span class="chip"><i style="background:${esc(companyColor(person.company))}"></i>${esc(person.company)}</span> <span class="chip">${label}</span></div>
     <dl class="kv"><dt>Bed</dt><dd>${esc(bedLabel(key))}</dd><dt>Arrived</dt><dd>${fmt(person.arrive)}</dd><dt>Leaves</dt><dd>${fmt(person.depart)} <span class="note num">(${daysUntil(person.depart)>=0?daysUntil(person.depart)+" days left":Math.abs(daysUntil(person.depart))+" days overdue"})</span></dd>${person.notes?`<dt>Notes</dt><dd>${esc(person.notes)}</dd>`:""}</dl>
     ${next && now ? `<p class="note">Next in this bed: ${esc(next.name)} from ${fmt(next.arrive)}.</p>`:""}
-    <h3>Change</h3>
+    ${isAdmin?`<h3>Change</h3>
     <div class="grid2"><div class="field"><label for="eArrive">Arrival</label><input type="date" id="eArrive" value="${person.arrive}"></div><div class="field"><label for="eDepart">Departure</label><input type="date" id="eDepart" value="${person.depart}"></div></div>
     <div class="field"><label for="eNotes">Notes</label><input id="eNotes" value="${esc(person.notes||"")}"></div>
     <div class="actions"><button class="btn" id="eSave">Save dates</button><button class="btn" id="eMove">Move to another bed</button></div>
     <div class="actions"><button class="btn primary" id="eOut">Check out now</button><button class="btn danger" id="eCancel">Remove without record</button></div>
-    <div id="dMsg" class="msg err" hidden></div>`;
+    <div id="dMsg" class="msg err" hidden></div>`:""}`;
   d.querySelector("#dClose").onclick=closeDrawer;
+  if (!isAdmin) return;
   d.querySelector("#eSave").onclick=async()=>{
     const arrive=d.querySelector("#eArrive").value, depart=d.querySelector("#eDepart").value, notes=d.querySelector("#eNotes").value.trim();
     const m=d.querySelector("#dMsg");
@@ -651,10 +653,12 @@ $("#btnLogout").onclick=()=>sb.auth.signOut();
 sb.auth.onAuthStateChange(async (event, s) => {
   session = s;
   if (event==="PASSWORD_RECOVERY"){ const np=prompt("Choose a new password (8+ characters):"); if(np){ const {error}=await sb.auth.updateUser({password:np}); toast(error?error.message:"Password updated"); } }
-  const wasAdmin = isAdmin;
-  if (s){ const {data} = await sb.rpc("is_admin"); isAdmin = !!data; if(s && !isAdmin) showMsg("#loginMsg","This account is signed in but is not on the admin list.","err"); }
-  else isAdmin = false;
-  if (isAdmin && !wasAdmin && (location.hash==="#admin"||!location.hash)) location.hash="#map";
+  const couldView = canView;
+  if (s){ const {data} = await sb.rpc("my_role"); role = data||null; }
+  else role = null;
+  isAdmin = role==="admin"; canView = !!role;
+  if (s && !canView) showMsg("#loginMsg","This account is signed in but has no access to the board. Ask the camp admin.","err");
+  if (canView && !couldView && (location.hash==="#admin"||!location.hash)) location.hash="#map";
   loaded=false; layout=null; stays=[];
   await loadAll(); subscribe(); render();
 });
