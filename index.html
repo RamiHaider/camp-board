@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Camp Bed Board</title>
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --surface-2:#e9edeb; --line:#cfd6d2; --fg:#182420; --muted:#5d6b66;
+  --accent:#1f6f5b; --accent-fg:#ffffff;
+  --free:#3d9a6a; --warn:#d49a1b; --bad:#c6453d; --reserved:#6b7cc7; --pending:#8a63c9;
+  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --shadow:0 8px 24px rgba(20,40,32,.12);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#141a18; --surface:#1d2522; --surface-2:#273029; --line:#36423d; --fg:#e8ede9; --muted:#9aa8a1;
+  --accent:#4fb08f; --accent-fg:#0f1a15; --free:#4fb87f; --warn:#e0b040; --bad:#e2655c; --reserved:#8d9be0; --pending:#a98ae0;
+  --shadow:0 8px 24px rgba(0,0,0,.45); color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#141a18; --surface:#1d2522; --surface-2:#273029; --line:#36423d; --fg:#e8ede9; --muted:#9aa8a1;
+  --accent:#4fb08f; --accent-fg:#0f1a15; --free:#4fb87f; --warn:#e0b040; --bad:#e2655c; --reserved:#8d9be0; --pending:#a98ae0;
+  --shadow:0 8px 24px rgba(0,0,0,.45); color-scheme:dark }
+
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.2}
+h1{font-size:17px;font-weight:600}
+h2{font-size:15px;font-weight:600}
+h3{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.num{font-variant-numeric:tabular-nums}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+[hidden]{display:none!important}
+
+.top{position:sticky;top:0;z-index:9;background:var(--surface);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.top .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;align-items:center}
+nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:6px;font-weight:500}
+nav a[aria-current="page"]{color:var(--fg);background:var(--surface-2)}
+nav a:hover{color:var(--fg)}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--pending);color:#fff;font-size:11px;font-weight:600;margin-left:6px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding-block:14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat .v{font-size:22px;font-weight:600}
+.stat .l{font-size:12px;color:var(--muted)}
+.stat.free .v{color:var(--free)} .stat.leaving .v{color:var(--warn)} .stat.pending .v{color:var(--pending)} .stat.overdue .v{color:var(--bad)}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 12px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 50%,var(--line))}
+.btn.sm{padding:4px 9px;font-size:12.5px}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.bed:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12px;color:var(--muted);font-weight:500}
+input,select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;min-width:0}
+textarea{min-height:60px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.note{font-size:12.5px;color:var(--muted)}
+.msg{padding:8px 10px;border-radius:6px;background:var(--surface-2);font-size:13px;margin-top:10px}
+.msg.err{color:var(--bad)}
+.msg.ok{color:var(--free)}
+
+main{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding-block:0 32px}
+main.has-drawer{grid-template-columns:minmax(0,1fr) 340px}
+@media (max-width:900px){main.has-drawer{grid-template-columns:minmax(0,1fr)}}
+
+.maphead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.maphead .filter{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.maphead .filter input{width:auto;padding:5px 7px}
+.modebar{padding:9px 12px;border-radius:6px;background:color-mix(in srgb,var(--accent) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.sections{display:flex;flex-direction:column;gap:18px}
+.section{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.section header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.section header .cnt{color:var(--muted);font-size:12.5px}
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.room{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px;min-width:0}
+.room .rn{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:6px}
+.bed{display:flex;flex-direction:column;gap:1px;border:1px solid var(--line);border-left:5px solid var(--line);border-radius:6px;padding:5px 7px;background:var(--surface);text-align:left;min-height:38px;width:100%;position:relative;transition:transform .08s}
+.bed:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.bed .n{font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bed .s{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bed.free{border-style:dashed;border-left-style:solid;border-left-color:var(--free);background:color-mix(in srgb,var(--free) 8%,var(--surface))}
+.bed.free .n{color:var(--free)}
+.bed.reserved{border-left-color:var(--reserved);background:color-mix(in srgb,var(--reserved) 10%,var(--surface))}
+.bed.leaving::after,.bed.overdue::after{content:"";position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--warn)}
+.bed.overdue::after{background:var(--bad)}
+.bed.target{outline:2px dashed var(--accent);outline-offset:1px;animation:pulse 1.2s infinite}
+.bed.selected{box-shadow:0 0 0 2px var(--accent)}
+.bed.dim{opacity:.35}
+@keyframes pulse{50%{outline-color:transparent}}
+@media (prefers-reduced-motion:reduce){.bed{transition:none}.bed.target{animation:none}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:14px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+aside.drawer{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;align-self:start;position:sticky;top:calc(env(safe-area-inset-top,0px) + 62px);display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 80px);overflow:auto}
+@media (max-width:900px){aside.drawer{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:75vh;border-radius:14px 14px 0 0;box-shadow:var(--shadow);z-index:20;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}}
+.drawer .hd{display:flex;align-items:flex-start;gap:8px}
+.drawer .hd h2{flex:1}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500;border:1px solid var(--line)}
+.chip i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.swatches{display:flex;gap:6px;flex-wrap:wrap}
+.sw{width:24px;height:24px;border-radius:50%;border:2px solid transparent;padding:0}
+.sw[aria-pressed="true"]{border-color:var(--fg)}
+
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.list{display:flex;flex-direction:column;gap:6px}
+.item{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;background:var(--bg);border-left:4px solid var(--line);min-width:0}
+.item .who{flex:1;min-width:0}
+.item .who b{font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .who small{color:var(--muted);display:block;font-size:12px}
+.item .when{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.empty{color:var(--muted);font-size:13px;padding:6px 0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:12px}
+.tablewrap{overflow-x:auto}
+
+.form{max-width:520px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.edit .room{gap:4px}
+.edit .room input{padding:4px 6px;font-size:12.5px}
+.editrow{display:flex;gap:6px;align-items:center}
+.editrow input[type=number]{width:60px}
+.setup{max-width:560px;margin:40px auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:14px}
+.setup ol{margin:0;padding-left:20px;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;z-index:30;box-shadow:var(--shadow)}
+</style>
+</head>
+<body>
+
+<div class="top wrap">
+  <div class="row">
+    <div class="brand"><span class="dot"></span><h1>Camp Bed Board</h1></div>
+    <nav id="nav">
+      <a href="#map" data-view="map" class="adminonly">Map</a>
+      <a href="#people" data-view="people" class="adminonly">People<span class="badge" id="pendBadge" hidden>0</span></a>
+      <a href="#request" data-view="request">Request a bed</a>
+      <a href="#history" data-view="history" class="adminonly">History</a>
+      <a href="#admin" data-view="admin" id="adminLink">Admin</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="status" class="msg" hidden></div>
+  <div id="setup" class="setup" hidden>
+    <h2>Set up the camp</h2>
+    <p class="note">No rooms yet. Start from a small template and change the names, rooms and beds to match the real camp. You can edit the layout any time from the map.</p>
+    <ol>
+      <li>Create the starter layout below.</li>
+      <li>Press <b>Edit layout</b> on the map and fix section names, rooms and bed counts.</li>
+      <li>Share this link with whoever puts in bed requests.</li>
+    </ol>
+    <div class="actions"><button class="btn primary" id="btnStarter">Create starter layout (2 sections)</button></div>
+  </div>
+
+  <main id="main">
+    <div>
+      <section class="view" id="view-map" hidden>
+        <div class="stats" id="stats"></div>
+        <div class="maphead">
+          <button class="btn sm" id="btnAddPerson">+ Add person</button>
+          <button class="btn sm" id="btnEditLayout">Edit layout</button>
+          <span class="filter">Free between <input type="date" id="fFrom"> and <input type="date" id="fTo"> <button class="btn sm" id="fClear" hidden>Clear</button></span>
+        </div>
+        <div id="modebar" class="modebar" hidden></div>
+        <div id="sections" class="sections"></div>
+        <div class="legend">
+          <span><i style="background:var(--free)"></i>Free</span>
+          <span><i style="background:var(--line)"></i>Occupied (color = company)</span>
+          <span><i style="background:var(--reserved)"></i>Reserved, arriving later</span>
+          <span><i style="background:var(--warn);border-radius:50%"></i>Leaving within 48 h</span>
+          <span><i style="background:var(--bad);border-radius:50%"></i>Past departure date</span>
+        </div>
+      </section>
+
+      <section class="view" id="view-people" hidden>
+        <div class="cols" id="peopleCols" style="margin-top:16px"></div>
+      </section>
+
+      <section class="view" id="view-request" hidden>
+        <form class="form" id="reqForm">
+          <h2>Request a bed</h2>
+          <p class="note">Fill this in and the camp admin will assign a room. You will not pick the room yourself.</p>
+          <div class="field"><label for="rName">Full name</label><input id="rName" required autocomplete="name" maxlength="120"></div>
+          <div class="field"><label for="rCompany">Company / crew</label><input id="rCompany" list="companyList" required autocomplete="off" maxlength="80" placeholder="Pick one or type a new one"><datalist id="companyList"></datalist></div>
+          <div class="grid2">
+            <div class="field"><label for="rArrive">Arrival</label><input type="date" id="rArrive" required></div>
+            <div class="field"><label for="rDepart">Departure</label><input type="date" id="rDepart" required></div>
+          </div>
+          <div class="field"><label for="rNotes">Notes (role, preferences, anything useful)</label><textarea id="rNotes" maxlength="500"></textarea></div>
+          <div class="field"><label for="rCode">Camp code</label><input id="rCode" required autocomplete="off" autocapitalize="characters" placeholder="Ask at camp or check the kitchen wall"></div>
+          <div class="actions"><button class="btn primary" type="submit" id="rSend">Send request</button></div>
+          <div id="reqMsg" class="msg" hidden></div>
+        </form>
+      </section>
+
+      <section class="view" id="view-history" hidden>
+        <div class="card" style="margin-top:16px"><h3>Checked out</h3><div class="tablewrap"><table><thead><tr><th>Name</th><th>Company</th><th>Bed</th><th>Arrived</th><th>Left</th><th>Closed</th></tr></thead><tbody id="histBody"></tbody></table></div></div>
+      </section>
+
+      <section class="view" id="view-admin" hidden>
+        <form class="form" id="loginForm">
+          <h2>Admin sign in</h2>
+          <div class="field"><label for="lEmail">Email</label><input type="email" id="lEmail" required autocomplete="username"></div>
+          <div class="field"><label for="lPass">Password</label><input type="password" id="lPass" required autocomplete="current-password"></div>
+          <div class="actions"><button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" id="lReset">Forgot password</button></div>
+          <div id="loginMsg" class="msg" hidden></div>
+        </form>
+        <div class="form" id="adminPanel" hidden>
+          <h2>Admin</h2>
+          <p class="note" id="whoami"></p>
+          <div class="field"><label for="sCode">Camp code requesters must type</label><input id="sCode" autocapitalize="characters" maxlength="24"></div>
+          <div class="actions"><button class="btn primary" id="sSaveCode">Save code</button><button class="btn" id="btnLogout">Sign out</button></div>
+          <div id="adminMsg" class="msg" hidden></div>
+        </div>
+      </section>
+    </div>
+    <aside class="drawer" id="drawer" hidden></aside>
+  </main>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script>
+(() => {
+"use strict";
+// ---- config (filled in at deploy time) ----
+const SUPABASE_URL = "__SUPABASE_URL__";
+const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const PALETTE = ["#2e7bd6","#d6632e","#8a3fc9","#c22f6a","#1f9ea3","#b58a00","#5a8f29","#d04b9a","#4d6bd4","#8c6a3f"];
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let session = null, isAdmin = false;
+let layout = null, stays = [], companies = [], settings = null;
+let mode = null, selectedBed = null, drawerKind = null;
+let editing = false, editLayout = null;
+let filter = {from:"", to:""};
+let loaded = false;
+
+/* ---- dates ---- */
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today = () => ymd(new Date());
+const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate()+n); return ymd(d); };
+const daysUntil = s => Math.round((new Date(s+"T12:00:00") - new Date(today()+"T12:00:00"))/86400000);
+const fmt = s => { if(!s) return "—"; const d = new Date(String(s).slice(0,10)+"T12:00:00"); return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); };
+const uid = () => Math.random().toString(36).slice(2,10);
+
+/* ---- derived ---- */
+const bedKey = (s,r,n) => `${s}/${r}/${n}`;
+const bedLabel = key => { if(!key||!layout) return "—"; const [s,r,n] = key.split("/"); const sec = layout.sections.find(x=>x.id===s); const room = sec?.rooms.find(x=>x.id===r); return sec && room ? `${sec.name} · ${room.name} · bed ${n}` : key; };
+const companyColor = name => companies.find(c => c.name.toLowerCase() === String(name||"").toLowerCase())?.color || "#7a8a84";
+function stayState(s){
+  if (s.status !== "assigned") return null;
+  const t = today();
+  if (s.depart < t) return "overdue";
+  if (s.arrive > t) return "reserved";
+  if (daysUntil(s.depart) <= 1) return "leaving";
+  return "in";
+}
+function bedInfo(key){
+  const list = stays.filter(s => s.status==="assigned" && s.bed===key).map(s => ({...s, st: stayState(s)}));
+  const now = list.find(s => s.st!=="reserved") || null;
+  const next = list.filter(s => s.st==="reserved").sort((a,b)=>a.arrive<b.arrive?-1:1)[0] || null;
+  return {now, next, all:list};
+}
+const freeBetween = (key, a, b) => !stays.some(s => s.status==="assigned" && s.bed===key && s.arrive <= b && s.depart >= a);
+const allBeds = () => { const out=[]; (layout?.sections||[]).forEach(s=>s.rooms.forEach(r=>{ for(let i=1;i<=r.beds;i++) out.push(bedKey(s.id,r.id,i)); })); return out; };
+
+/* ---- data ---- */
+async function loadAll(){
+  if (!isAdmin){ const {data} = await sb.from("companies").select("name,color").order("name"); companies = data||[]; renderCompanyList(); return; }
+  const [L, S, C, T] = await Promise.all([
+    sb.from("layout").select("*").eq("id","main").maybeSingle(),
+    sb.from("stays").select("*"),
+    sb.from("companies").select("*").order("name"),
+    sb.from("settings").select("*").eq("id","main").maybeSingle(),
+  ]);
+  const err = L.error||S.error||C.error||T.error;
+  if (err){ setStatus("Could not load camp data: "+err.message, "err"); return; }
+  layout = L.data && L.data.sections?.length ? L.data : null;
+  stays = (S.data||[]).map(s => ({...s, arrive:String(s.arrive).slice(0,10), depart:String(s.depart).slice(0,10)}));
+  companies = C.data||[]; settings = T.data||null;
+  loaded = true; setStatus(""); render();
+}
+let channel = null, pollTimer = null;
+function subscribe(){
+  if (channel) { sb.removeChannel(channel); channel=null; }
+  clearInterval(pollTimer);
+  if (!isAdmin) return;
+  const refetch = () => { clearTimeout(subscribe.t); subscribe.t = setTimeout(loadAll, 150); };
+  channel = sb.channel("camp")
+    .on("postgres_changes",{event:"*",schema:"public",table:"stays"}, refetch)
+    .on("postgres_changes",{event:"*",schema:"public",table:"companies"}, refetch)
+    .on("postgres_changes",{event:"*",schema:"public",table:"layout"}, refetch)
+    .on("postgres_changes",{event:"*",schema:"public",table:"settings"}, refetch)
+    .subscribe();
+  pollTimer = setInterval(loadAll, 60000); // safety net if realtime drops
+}
+const db = {
+  async insertStay(row){ const {data,error} = await sb.from("stays").insert(row).select("id").single(); if(error) throw error; await loadAll(); return data; },
+  async updateStay(id,patch){ const {error} = await sb.from("stays").update(patch).eq("id",id); if(error) throw error; await loadAll(); },
+  async deleteStay(id){ const {error} = await sb.from("stays").delete().eq("id",id); if(error) throw error; await loadAll(); },
+  async saveLayout(sections){ const {error} = await sb.from("layout").upsert({id:"main",sections,updated_at:new Date().toISOString()}); if(error) throw error; await loadAll(); },
+  async addCompany(name,color){ const {error} = await sb.from("companies").insert({name,color}); if(error && error.code!=="23505") throw error; await loadAll(); },
+};
+
+/* ---- views ---- */
+const VIEWS = ["map","people","request","history","admin"];
+function route(){
+  const h = location.hash.replace("#","");
+  let v = VIEWS.includes(h) ? h : (isAdmin ? "map" : "request");
+  if (!isAdmin && !["request","admin"].includes(v)) v = "request";
+  VIEWS.forEach(x => { $("#view-"+x).hidden = x!==v; });
+  document.querySelectorAll("#nav a").forEach(a => a.dataset.view===v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
+  document.querySelectorAll(".adminonly").forEach(a => a.hidden = !isAdmin);
+  $("#adminLink").textContent = isAdmin ? "Admin" : "Admin sign in";
+  $("#setup").hidden = !(isAdmin && loaded && !layout && v==="map");
+  if (v!=="map") closeDrawer();
+}
+window.addEventListener("hashchange", route);
+
+function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>el.hidden=true, 2600); }
+function setStatus(t, cls){ const el=$("#status"); el.hidden=!t; el.textContent=t||""; el.className="msg "+(cls||""); }
+const showMsg = (sel, text, cls) => { const m=$(sel); m.hidden=!text; m.textContent=text||""; m.className="msg "+(cls||""); };
+
+/* ---- render ---- */
+function render(){
+  route();
+  renderCompanyList(); renderAdminPanel();
+  if (!isAdmin || !loaded) return;
+  if (!layout){ renderPeople(); return; }
+  renderStats(); renderMap(); renderPeople(); renderHistory(); renderDrawer();
+  const pend = stays.filter(s=>s.status==="requested").length;
+  $("#pendBadge").hidden = !pend; $("#pendBadge").textContent = pend;
+}
+
+function renderStats(){
+  const beds = allBeds(); const t = today();
+  let occ=0, leaving=0, overdue=0;
+  beds.forEach(k => { const {now} = bedInfo(k); if(now){occ++; if(now.st==="leaving")leaving++; if(now.st==="overdue")overdue++;} });
+  const pend = stays.filter(s=>s.status==="requested").length;
+  const arriving = stays.filter(s=>s.status==="assigned" && s.arrive===t).length;
+  $("#stats").innerHTML = `
+    <div class="stat free"><span class="v num">${beds.length-occ}</span><span class="l">beds free now · of ${beds.length}</span></div>
+    <div class="stat"><span class="v num">${occ}</span><span class="l">people in camp</span></div>
+    <div class="stat leaving"><span class="v num">${leaving}</span><span class="l">leaving within 48 h</span></div>
+    <div class="stat"><span class="v num">${arriving}</span><span class="l">arriving today</span></div>
+    <div class="stat pending"><span class="v num">${pend}</span><span class="l">requests waiting</span></div>
+    ${overdue?`<div class="stat overdue"><span class="v num">${overdue}</span><span class="l">past departure date</span></div>`:""}`;
+}
+
+function renderMap(){
+  const host = $("#sections");
+  const L = editing ? editLayout : layout;
+  host.classList.toggle("edit", editing);
+  const mb = $("#modebar");
+  if (mode) {
+    const s = stays.find(x=>x.id===mode.stayId);
+    mb.hidden=false;
+    mb.innerHTML = `<b>${mode.type==="move"?"Moving":"Assigning"} ${esc(s?.name||"")}</b><span class="note">Click a free bed on the map. Beds that are taken during ${fmt(s?.arrive)} – ${fmt(s?.depart)} are dimmed.</span><button class="btn sm" id="cancelMode">Cancel</button>`;
+    mb.querySelector("#cancelMode").onclick = () => { mode=null; render(); };
+  } else if (editing) {
+    mb.hidden=false;
+    mb.innerHTML = `<b>Editing layout</b><span class="note">Rename sections and rooms, change bed counts, add or remove rooms. Rooms with people in them cannot be removed.</span><button class="btn sm primary" id="saveLayout">Save layout</button><button class="btn sm" id="cancelLayout">Cancel</button>`;
+    mb.querySelector("#saveLayout").onclick = saveLayout;
+    mb.querySelector("#cancelLayout").onclick = () => { editing=false; editLayout=null; render(); };
+  } else mb.hidden=true;
+
+  const hasFilter = filter.from && filter.to;
+  $("#fClear").hidden = !hasFilter;
+  const modeStay = mode ? stays.find(x=>x.id===mode.stayId) : null;
+
+  host.innerHTML = L.sections.map(sec => {
+    const bedCount = sec.rooms.reduce((a,r)=>a+Number(r.beds||0),0);
+    let free=0; sec.rooms.forEach(r=>{for(let i=1;i<=r.beds;i++) if(!bedInfo(bedKey(sec.id,r.id,i)).now) free++;});
+    const head = editing
+      ? `<header><input value="${esc(sec.name)}" data-sec="${sec.id}" data-f="name" aria-label="Section name" style="max-width:240px"><button class="btn sm" data-addroom="${sec.id}">+ Room</button><button class="btn sm danger" data-delsec="${sec.id}">Remove section</button></header>`
+      : `<header><h2>${esc(sec.name)}</h2><span class="cnt num">${free} free of ${bedCount}</span></header>`;
+    const rooms = sec.rooms.map(r => {
+      let beds = "";
+      for (let i=1;i<=r.beds;i++){
+        const key = bedKey(sec.id,r.id,i);
+        const {now,next} = bedInfo(key);
+        let cls="bed", name="Free", sub="", stripe="";
+        if (now){ cls+=" "+now.st; name=now.name; sub=`${now.company} · ${now.st==="overdue"?"due out "+fmt(now.depart):"to "+fmt(now.depart)}`; stripe=`style="border-left-color:${esc(companyColor(now.company))}"`; }
+        else if (next){ cls+=" reserved"; name="Reserved"; sub=`${next.name} from ${fmt(next.arrive)}`; }
+        else { cls+=" free"; sub="open"; }
+        if (modeStay){ const ok = modeStay.bed!==key && freeBetween(key, modeStay.arrive, modeStay.depart); cls += ok?" target":" dim"; }
+        else if (hasFilter){ cls += freeBetween(key, filter.from, filter.to) ? " target" : " dim"; }
+        if (selectedBed===key) cls+=" selected";
+        beds += `<button type="button" class="${cls}" data-bed="${key}" ${stripe} title="${esc(bedLabel(key))}"><span class="n">${esc(name)}</span><span class="s">${esc(sub)}</span></button>`;
+      }
+      const rn = editing
+        ? `<div class="editrow"><input value="${esc(r.name)}" data-sec="${sec.id}" data-room="${r.id}" data-f="name" aria-label="Room name"><input type="number" min="1" max="12" value="${r.beds}" data-sec="${sec.id}" data-room="${r.id}" data-f="beds" aria-label="Beds"><button class="btn sm danger" data-delroom="${sec.id}/${r.id}" title="Remove room">×</button></div>`
+        : `<div class="rn"><span>${esc(r.name)}</span><span class="num">${r.beds} ${r.beds===1?"bed":"beds"}</span></div>`;
+      return `<div class="room">${rn}${beds}</div>`;
+    }).join("");
+    return `<div class="section">${head}<div class="rooms">${rooms}</div></div>`;
+  }).join("") + (editing ? `<div><button class="btn" id="addSec">+ Add section</button></div>` : "");
+
+  if (editing){
+    host.querySelectorAll("input[data-f]").forEach(inp => inp.oninput = () => {
+      const sec = editLayout.sections.find(s=>s.id===inp.dataset.sec);
+      const tgt = inp.dataset.room ? sec.rooms.find(r=>r.id===inp.dataset.room) : sec;
+      tgt[inp.dataset.f] = inp.dataset.f==="beds" ? Math.max(1, Math.min(12, Number(inp.value)||1)) : inp.value;
+    });
+    host.querySelectorAll("[data-addroom]").forEach(b => b.onclick = () => { const sec=editLayout.sections.find(s=>s.id===b.dataset.addroom); sec.rooms.push({id:uid(), name:`Room ${sec.rooms.length+1}`, beds:2}); render(); });
+    host.querySelectorAll("[data-delroom]").forEach(b => b.onclick = () => {
+      const [sid,rid] = b.dataset.delroom.split("/"); const sec=editLayout.sections.find(s=>s.id===sid);
+      if (stays.some(s=>s.status==="assigned" && s.bed?.startsWith(`${sid}/${rid}/`))) return toast("That room has people assigned. Move or check them out first.");
+      sec.rooms = sec.rooms.filter(r=>r.id!==rid); render();
+    });
+    host.querySelectorAll("[data-delsec]").forEach(b => b.onclick = () => {
+      const sid=b.dataset.delsec;
+      if (stays.some(s=>s.status==="assigned" && s.bed?.startsWith(sid+"/"))) return toast("That section has people assigned. Move or check them out first.");
+      editLayout.sections = editLayout.sections.filter(s=>s.id!==sid); render();
+    });
+    const add = host.querySelector("#addSec"); if (add) add.onclick = () => { editLayout.sections.push({id:uid(), name:`Section ${editLayout.sections.length+1}`, rooms:[{id:uid(),name:"Room 1",beds:2}]}); render(); };
+  } else {
+    host.querySelectorAll(".bed").forEach(b => b.onclick = () => onBedClick(b.dataset.bed));
+  }
+}
+
+function renderCompanyList(){ $("#companyList").innerHTML = companies.map(c=>`<option value="${esc(c.name)}">`).join(""); }
+
+function itemRow(s, extra){
+  const col = companyColor(s.company);
+  return `<div class="item" style="border-left-color:${esc(col)}"><div class="who"><b>${esc(s.name)}</b><small>${esc(s.company)}${s.bed?" · "+esc(bedLabel(s.bed)):""}${s.notes?" · "+esc(s.notes):""}</small></div><span class="when">${fmt(s.arrive)} → ${fmt(s.depart)}</span>${extra||""}</div>`;
+}
+function renderPeople(){
+  const t=today(), week=addDays(t,7);
+  const pending = stays.filter(s=>s.status==="requested").sort((a,b)=>a.arrive<b.arrive?-1:1);
+  const assigned = stays.filter(s=>s.status==="assigned");
+  const arriving = assigned.filter(s=>s.arrive>=t && s.arrive<=addDays(t,2)).sort((a,b)=>a.arrive<b.arrive?-1:1);
+  const leaving = assigned.filter(s=>s.depart<=week).sort((a,b)=>a.depart<b.depart?-1:1);
+  const inCamp = assigned.filter(s=>s.arrive<=t).sort((a,b)=>a.depart<b.depart?-1:1);
+  const card = (title, list, fn, emptyText) => `<div class="card"><h3>${title} <span class="num">(${list.length})</span></h3><div class="list">${list.length?list.map(fn).join(""):`<div class="empty">${emptyText}</div>`}</div></div>`;
+  $("#peopleCols").innerHTML =
+    card("Requests waiting", pending, s=>itemRow(s, `<button class="btn sm primary" data-assign="${s.id}">Assign</button><button class="btn sm" data-decline="${s.id}" title="Decline">×</button>`), "No open requests.") +
+    card("Leaving in the next 7 days", leaving, s=>itemRow(s, `<button class="btn sm" data-checkout="${s.id}">Check out</button>`), "Nobody leaving this week.") +
+    card("Arriving in the next 2 days", arriving, s=>itemRow(s), "Nobody arriving.") +
+    card("Everyone in camp", inCamp, s=>itemRow(s, `<button class="btn sm" data-open="${s.id}">Open</button>`), "Camp is empty.");
+  const host=$("#peopleCols");
+  host.querySelectorAll("[data-assign]").forEach(b=>b.onclick=()=>{ if(!layout) return toast("Create the layout first (Map tab)."); mode={type:"assign",stayId:b.dataset.assign}; selectedBed=null; closeDrawer(); location.hash="#map"; render(); });
+  host.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>declineRequest(b.dataset.decline));
+  host.querySelectorAll("[data-checkout]").forEach(b=>b.onclick=()=>checkOut(b.dataset.checkout));
+  host.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{ const s=stays.find(x=>x.id===b.dataset.open); if(s?.bed){ selectedBed=s.bed; drawerKind="bed"; location.hash="#map"; render(); } });
+}
+function renderHistory(){
+  const rows = stays.filter(s=>s.status==="checked_out"||s.status==="declined").sort((a,b)=>(b.closed_at||"")<(a.closed_at||"")?-1:1).slice(0,300);
+  $("#histBody").innerHTML = rows.length ? rows.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.company)}</td><td>${s.bed?esc(bedLabel(s.bed)):"<span class='note'>declined</span>"}</td><td>${fmt(s.arrive)}</td><td>${fmt(s.depart)}</td><td>${fmt(s.closed_at)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty">Nothing checked out yet.</td></tr>`;
+}
+function renderAdminPanel(){
+  $("#loginForm").hidden = isAdmin;
+  $("#adminPanel").hidden = !isAdmin;
+  if (isAdmin){
+    $("#whoami").textContent = `Signed in as ${session?.user?.email||""}.`;
+    if (settings && document.activeElement!==$("#sCode")) $("#sCode").value = settings.request_code||"";
+  }
+}
+
+/* ---- drawer ---- */
+function closeDrawer(){ selectedBed=null; drawerKind=null; $("#drawer").hidden=true; $("#main").classList.remove("has-drawer"); document.querySelectorAll(".bed.selected").forEach(b=>b.classList.remove("selected")); }
+function companyPicker(selName, selColor){
+  const opts = companies.map(c=>`<option value="${esc(c.name)}" ${c.name===selName?"selected":""}>${esc(c.name)}</option>`).join("");
+  return `<div class="field"><label for="pCompany">Company / crew</label><select id="pCompany"><option value="">— choose —</option>${opts}<option value="__new">+ New company…</option></select></div>
+  <div id="newCo" hidden style="display:flex;flex-direction:column;gap:8px"><div class="field"><label for="pCoName">New company name</label><input id="pCoName"></div><div class="field"><label>Color</label><div class="swatches">${PALETTE.map(c=>`<button type="button" class="sw" style="background:${c}" data-c="${c}" aria-label="${c}" aria-pressed="${c===selColor}"></button>`).join("")}</div></div></div>`;
+}
+function wireCompanyPicker(root){
+  const sel=root.querySelector("#pCompany"), box=root.querySelector("#newCo");
+  sel.onchange=()=>{ box.hidden = sel.value!=="__new"; };
+  root.querySelectorAll(".sw").forEach(b=>b.onclick=()=>{ root.querySelectorAll(".sw").forEach(x=>x.setAttribute("aria-pressed","false")); b.setAttribute("aria-pressed","true"); });
+}
+async function resolveCompany(root){
+  const sel=root.querySelector("#pCompany");
+  if (sel.value==="__new"){
+    const name=root.querySelector("#pCoName").value.trim(); if(!name) throw new Error("Give the new company a name.");
+    const color=root.querySelector(".sw[aria-pressed='true']")?.dataset.c || PALETTE[companies.length%PALETTE.length];
+    await ensureCompany(name, color); return name;
+  }
+  if (!sel.value) throw new Error("Choose a company.");
+  return sel.value;
+}
+async function ensureCompany(name, color){
+  if (companies.some(c=>c.name.toLowerCase()===name.toLowerCase())) return;
+  await db.addCompany(name, color || PALETTE[companies.length%PALETTE.length]);
+}
+
+function renderDrawer(){
+  const d=$("#drawer");
+  if (!drawerKind){ d.hidden=true; $("#main").classList.remove("has-drawer"); return; }
+  d.hidden=false; $("#main").classList.add("has-drawer");
+  const t=today();
+  if (drawerKind==="add"){
+    d.innerHTML = `<div class="hd"><h2>${selectedBed?"Put someone in "+esc(bedLabel(selectedBed)):"Add a person"}</h2><button class="btn sm" id="dClose">Close</button></div>
+      <div class="field"><label for="pName">Full name</label><input id="pName" autocomplete="off"></div>
+      ${companyPicker("", "")}
+      <div class="grid2"><div class="field"><label for="pArrive">Arrival</label><input type="date" id="pArrive" value="${t}"></div><div class="field"><label for="pDepart">Departure</label><input type="date" id="pDepart" value="${addDays(t,14)}"></div></div>
+      <div class="field"><label for="pNotes">Notes</label><textarea id="pNotes"></textarea></div>
+      <div class="actions"><button class="btn primary" id="pSave">${selectedBed?"Assign to this bed":"Add and pick a bed"}</button></div><div id="dMsg" class="msg err" hidden></div>`;
+    wireCompanyPicker(d);
+    d.querySelector("#dClose").onclick=closeDrawer;
+    d.querySelector("#pSave").onclick=async()=>{
+      try{
+        const name=d.querySelector("#pName").value.trim(); if(!name) throw new Error("Name is required.");
+        const arrive=d.querySelector("#pArrive").value, depart=d.querySelector("#pDepart").value;
+        if(!arrive||!depart||depart<arrive) throw new Error("Check the dates. Departure must be on or after arrival.");
+        const company=await resolveCompany(d);
+        const notes=d.querySelector("#pNotes").value.trim();
+        if (selectedBed){
+          if(!freeBetween(selectedBed,arrive,depart)) throw new Error("That bed is taken for part of those dates.");
+          await db.insertStay({name,company,arrive,depart,notes,bed:selectedBed,status:"assigned",assigned_at:new Date().toISOString()});
+          toast(`${name} assigned to ${bedLabel(selectedBed)}`); drawerKind="bed";
+        } else {
+          const row=await db.insertStay({name,company,arrive,depart,notes,bed:null,status:"requested"});
+          mode={type:"assign",stayId:row.id}; closeDrawer();
+        }
+        render();
+      }catch(e){ const m=d.querySelector("#dMsg"); m.hidden=false; m.textContent=e.message||"Could not save. Try again."; }
+    };
+    return;
+  }
+  const key=selectedBed; const {now,next}=bedInfo(key);
+  const person = now || next;
+  if (!person){
+    d.innerHTML = `<div class="hd"><h2>${esc(bedLabel(key))}</h2><button class="btn sm" id="dClose">Close</button></div><p class="note">Free bed.</p>
+      <div class="actions"><button class="btn primary" id="dPut">Put someone here</button></div>
+      ${stays.some(s=>s.status==="requested")?`<h3>Assign a waiting request</h3><div class="list">${stays.filter(s=>s.status==="requested").map(s=>itemRow(s,`<button class="btn sm primary" data-assignhere="${s.id}">Here</button>`)).join("")}</div>`:""}`;
+    d.querySelector("#dClose").onclick=closeDrawer;
+    d.querySelector("#dPut").onclick=()=>{ drawerKind="add"; render(); };
+    d.querySelectorAll("[data-assignhere]").forEach(b=>b.onclick=()=>assignToBed(b.dataset.assignhere, key));
+    return;
+  }
+  const st=stayState(person);
+  const label = {in:"In camp",leaving:"Leaving soon",overdue:"Past departure date",reserved:"Reserved, not yet arrived"}[st];
+  d.innerHTML = `<div class="hd"><h2>${esc(person.name)}</h2><button class="btn sm" id="dClose">Close</button></div>
+    <div><span class="chip"><i style="background:${esc(companyColor(person.company))}"></i>${esc(person.company)}</span> <span class="chip">${label}</span></div>
+    <dl class="kv"><dt>Bed</dt><dd>${esc(bedLabel(key))}</dd><dt>Arrived</dt><dd>${fmt(person.arrive)}</dd><dt>Leaves</dt><dd>${fmt(person.depart)} <span class="note num">(${daysUntil(person.depart)>=0?daysUntil(person.depart)+" days left":Math.abs(daysUntil(person.depart))+" days overdue"})</span></dd>${person.notes?`<dt>Notes</dt><dd>${esc(person.notes)}</dd>`:""}</dl>
+    ${next && now ? `<p class="note">Next in this bed: ${esc(next.name)} from ${fmt(next.arrive)}.</p>`:""}
+    <h3>Change</h3>
+    <div class="grid2"><div class="field"><label for="eArrive">Arrival</label><input type="date" id="eArrive" value="${person.arrive}"></div><div class="field"><label for="eDepart">Departure</label><input type="date" id="eDepart" value="${person.depart}"></div></div>
+    <div class="field"><label for="eNotes">Notes</label><input id="eNotes" value="${esc(person.notes||"")}"></div>
+    <div class="actions"><button class="btn" id="eSave">Save dates</button><button class="btn" id="eMove">Move to another bed</button></div>
+    <div class="actions"><button class="btn primary" id="eOut">Check out now</button><button class="btn danger" id="eCancel">Remove without record</button></div>
+    <div id="dMsg" class="msg err" hidden></div>`;
+  d.querySelector("#dClose").onclick=closeDrawer;
+  d.querySelector("#eSave").onclick=async()=>{
+    const arrive=d.querySelector("#eArrive").value, depart=d.querySelector("#eDepart").value, notes=d.querySelector("#eNotes").value.trim();
+    const m=d.querySelector("#dMsg");
+    if(!arrive||!depart||depart<arrive){ m.hidden=false; m.textContent="Departure must be on or after arrival."; return; }
+    const clash = stays.some(s=>s.id!==person.id && s.status==="assigned" && s.bed===key && s.arrive<=depart && s.depart>=arrive);
+    if (clash){ m.hidden=false; m.textContent="Those dates overlap someone else booked in this bed."; return; }
+    try{ await db.updateStay(person.id,{arrive,depart,notes}); toast("Saved"); }catch(e){ m.hidden=false; m.textContent=e.message; }
+  };
+  d.querySelector("#eMove").onclick=()=>{ mode={type:"move",stayId:person.id}; closeDrawer(); render(); };
+  d.querySelector("#eOut").onclick=()=>checkOut(person.id);
+  d.querySelector("#eCancel").onclick=async()=>{ const b=d.querySelector("#eCancel"); if(!b.dataset.sure){ b.dataset.sure="1"; b.textContent="Click again to confirm removal"; return; } await db.deleteStay(person.id); closeDrawer(); toast("Removed"); };
+}
+
+/* ---- actions ---- */
+async function onBedClick(key){
+  if (mode){
+    const s=stays.find(x=>x.id===mode.stayId); if(!s){ mode=null; render(); return; }
+    if (!freeBetween(key, s.arrive, s.depart)) return toast("That bed is taken during those dates.");
+    await assignToBed(s.id, key); mode=null; selectedBed=key; drawerKind="bed"; render(); return;
+  }
+  selectedBed=key; drawerKind="bed"; render();
+  if (window.innerWidth<=900) $("#drawer").scrollTop=0;
+}
+async function assignToBed(stayId, key){
+  const s=stays.find(x=>x.id===stayId); if(!s) return;
+  if (!freeBetween(key, s.arrive, s.depart)) return toast("That bed is taken during those dates.");
+  try{
+    await db.updateStay(stayId,{bed:key, status:"assigned", assigned_at:new Date().toISOString()});
+    toast(`${s.name} → ${bedLabel(key)}`);
+    if (s.company) await ensureCompany(s.company);
+  }catch(e){ toast("Could not assign: "+e.message); }
+}
+async function checkOut(stayId){
+  const s=stays.find(x=>x.id===stayId); if(!s) return;
+  try{
+    await db.updateStay(stayId,{status:"checked_out", closed_at:new Date().toISOString(), depart: s.depart>today()?today():s.depart});
+    toast(`${s.name} checked out`); if(selectedBed===s.bed) { drawerKind="bed"; render(); }
+  }catch(e){ toast("Could not check out: "+e.message); }
+}
+async function declineRequest(stayId){
+  try{ await db.updateStay(stayId,{status:"declined", closed_at:new Date().toISOString()}); toast("Request declined"); }catch(e){ toast(e.message); }
+}
+async function saveLayout(){
+  if (editLayout.sections.some(s=>!s.name.trim()||s.rooms.some(r=>!r.name.trim()))) return toast("Every section and room needs a name.");
+  try{ await db.saveLayout(editLayout.sections); editing=false; editLayout=null; toast("Layout saved"); render(); }catch(e){ toast("Could not save layout: "+e.message); }
+}
+
+$("#btnStarter").onclick=async()=>{
+  const mk=(name,n,beds)=>({id:uid(),name,rooms:Array.from({length:n},(_,i)=>({id:uid(),name:`Room ${i+1}`,beds}))});
+  try{ await db.saveLayout([mk("Section A",6,2), mk("Section B",4,2)]); toast("Starter layout created. Press Edit layout to make it match the camp."); }catch(e){ toast(e.message); }
+};
+$("#btnEditLayout").onclick=()=>{ if(mode||!layout) return; editing=true; editLayout=JSON.parse(JSON.stringify(layout)); closeDrawer(); render(); };
+$("#btnAddPerson").onclick=()=>{ if(mode||editing) return; selectedBed=null; drawerKind="add"; render(); };
+$("#fFrom").onchange=$("#fTo").onchange=()=>{ filter={from:$("#fFrom").value,to:$("#fTo").value}; render(); };
+$("#fClear").onclick=()=>{ filter={from:"",to:""}; $("#fFrom").value=""; $("#fTo").value=""; render(); };
+
+/* ---- request form (anyone) ---- */
+$("#reqForm").onsubmit=async e=>{
+  e.preventDefault();
+  const btn=$("#rSend"); btn.disabled=true;
+  try{
+    const name=$("#rName").value.trim(), company=$("#rCompany").value.trim(), arrive=$("#rArrive").value, depart=$("#rDepart").value, notes=$("#rNotes").value.trim(), code=$("#rCode").value.trim();
+    if(depart<arrive) throw new Error("Departure must be on or after arrival.");
+    const {error} = await sb.rpc("submit_request",{p_code:code,p_name:name,p_company:company,p_arrive:arrive,p_depart:depart,p_notes:notes});
+    if (error) throw new Error(error.message.includes("camp code") ? "Wrong camp code. Ask at camp." : error.message);
+    showMsg("#reqMsg", `Request sent for ${name}, ${fmt(arrive)} to ${fmt(depart)}. The camp admin will assign a bed.`, "ok");
+    const keepCode=code; e.target.reset(); $("#rArrive").value=today(); $("#rDepart").value=addDays(today(),14); $("#rCode").value=keepCode;
+    try{ localStorage.setItem("campCode", keepCode); }catch(_){}
+    if (isAdmin) loadAll(); else loadAll();
+  }catch(err){ showMsg("#reqMsg", err.message||"Could not send. Try again.", "err"); }
+  finally{ btn.disabled=false; }
+};
+
+/* ---- auth ---- */
+$("#loginForm").onsubmit=async e=>{
+  e.preventDefault();
+  showMsg("#loginMsg","Signing in…");
+  const {error} = await sb.auth.signInWithPassword({email:$("#lEmail").value.trim(), password:$("#lPass").value});
+  if (error) return showMsg("#loginMsg", error.message, "err");
+  showMsg("#loginMsg","");
+};
+$("#lReset").onclick=async()=>{
+  const email=$("#lEmail").value.trim(); if(!email) return showMsg("#loginMsg","Type your email first.","err");
+  const {error} = await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname+"#admin"});
+  showMsg("#loginMsg", error?error.message:"Check your email for a reset link.", error?"err":"ok");
+};
+$("#btnLogout").onclick=()=>sb.auth.signOut();
+$("#sSaveCode").onclick=async()=>{
+  const code=$("#sCode").value.trim().toUpperCase(); if(code.length<3) return showMsg("#adminMsg","Code must be at least 3 characters.","err");
+  const {error} = await sb.from("settings").upsert({id:"main",request_code:code,updated_at:new Date().toISOString()});
+  showMsg("#adminMsg", error?error.message:"Camp code saved.", error?"err":"ok"); if(!error) loadAll();
+};
+sb.auth.onAuthStateChange(async (event, s) => {
+  session = s;
+  if (event==="PASSWORD_RECOVERY"){ const np=prompt("Choose a new password (8+ characters):"); if(np){ const {error}=await sb.auth.updateUser({password:np}); toast(error?error.message:"Password updated"); } }
+  const wasAdmin = isAdmin;
+  if (s){ const {data} = await sb.rpc("is_admin"); isAdmin = !!data; if(s && !isAdmin) showMsg("#loginMsg","This account is signed in but is not on the admin list.","err"); }
+  else isAdmin = false;
+  if (isAdmin && !wasAdmin && (location.hash==="#admin"||!location.hash)) location.hash="#map";
+  loaded=false; layout=null; stays=[];
+  await loadAll(); subscribe(); render();
+});
+
+/* ---- boot ---- */
+const t0=today(); $("#rArrive").value=t0; $("#rDepart").value=addDays(t0,14);
+try{ const c=localStorage.getItem("campCode"); if(c) $("#rCode").value=c; }catch(_){}
+if (SUPABASE_URL.startsWith("__")) setStatus("This page is not connected to a database yet.", "err");
+render();
+})();
+</script>
+</body>
+</html>
