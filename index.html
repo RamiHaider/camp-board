@@ -205,12 +205,14 @@ th{color:var(--muted);font-weight:500;font-size:12px}
         <form class="form" id="reqForm">
           <h2>Request a bed</h2>
           <p class="note">Fill this in and the camp admin will assign rooms. You will not pick the room yourself. Sending a crew? Add each person below.</p>
+          <div class="field"><label for="rEmail">Your email (for the confirmation)</label><input type="email" id="rEmail" required autocomplete="email" maxlength="120" placeholder="you@company.com"></div>
           <div class="field"><label for="rCompany">Company / crew</label><input id="rCompany" list="companyList" required autocomplete="off" maxlength="80" placeholder="Pick one or type a new one"><datalist id="companyList"></datalist></div>
           <div id="rPeople" class="people"></div>
           <div><button type="button" class="btn sm" id="rAdd">+ Add another person</button></div>
           <div class="actions"><button class="btn primary" type="submit" id="rSend">Send request</button></div>
           <div id="reqMsg" class="msg" hidden></div>
         </form>
+        <div class="form" id="reqReceipt" hidden></div>
       </section>
 
       <section class="view" id="view-history" hidden>
@@ -448,7 +450,7 @@ function renderCompanyList(){ $("#companyList").innerHTML = companies.map(c=>`<o
 
 function itemRow(s, extra){
   const col = companyColor(s.company);
-  return `<div class="item" style="border-left-color:${esc(col)}"><div class="who"><b>${esc(s.name)}</b><small>${esc(s.company)}${s.bed?" · "+esc(bedLabel(s.bed)):""}${s.notes?" · "+esc(s.notes):""}</small></div><span class="when">${fmt(s.arrive)} → ${fmt(s.depart)}</span>${extra||""}</div>`;
+  return `<div class="item" style="border-left-color:${esc(col)}"><div class="who"><b>${esc(s.name)}</b><small>${esc(s.company)}${s.bed?" · "+esc(bedLabel(s.bed)):""}${s.requester_email?" · "+esc(s.requester_email):""}${s.notes?" · "+esc(s.notes):""}</small></div><span class="when">${fmt(s.arrive)} → ${fmt(s.depart)}</span>${extra||""}</div>`;
 }
 function renderPeople(){
   const t=today(), week=addDays(t,7);
@@ -657,7 +659,8 @@ $("#reqForm").onsubmit=async e=>{
   e.preventDefault();
   const btn=$("#rSend"); btn.disabled=true;
   try{
-    const company=$("#rCompany").value.trim(); const people=readPeople();
+    const email=$("#rEmail").value.trim(), company=$("#rCompany").value.trim(); const people=readPeople();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("A valid email is required.");
     if(!company) throw new Error("Company is required.");
     for (const [i,p] of people.entries()){
       if(p.name.length<2) throw new Error(`Person ${i+1}: name is required.`);
@@ -665,12 +668,14 @@ $("#reqForm").onsubmit=async e=>{
     }
     const sent=[];
     for (const p of people){
-      const {error} = await sb.rpc("submit_request",{p_name:p.name,p_company:company,p_arrive:p.arrive,p_depart:p.depart,p_notes:p.notes});
+      const {error} = await sb.rpc("submit_request",{p_email:email,p_name:p.name,p_company:company,p_arrive:p.arrive,p_depart:p.depart,p_notes:p.notes});
       if (error) throw new Error(`${p.name}: ${error.message}${sent.length?` (already sent: ${sent.join(", ")})`:""}`);
-      sent.push(p.name);
+      sent.push(p);
     }
-    showMsg("#reqMsg", sent.length===1 ? `Request sent for ${sent[0]}. The camp admin will assign a bed.` : `${sent.length} requests sent for ${company}: ${sent.join(", ")}. The camp admin will assign beds.`, "ok");
-    $("#rCompany").value=""; resetPeopleForm();
+    const r=$("#reqReceipt"); r.hidden=false; r.innerHTML = `<h2>Request received</h2><p class="note">Sent ${new Date().toLocaleString()} for <b>${esc(company)}</b>. Confirmation and room details will go to <b>${esc(email)}</b> once the camp admin assigns beds.</p><div class="tablewrap"><table><thead><tr><th>Name</th><th>Arrival</th><th>Departure</th><th>Notes</th></tr></thead><tbody>${sent.map(p=>`<tr><td>${esc(p.name)}</td><td>${fmt(p.arrive)}</td><td>${fmt(p.depart)}</td><td>${esc(p.notes||"")}</td></tr>`).join("")}</tbody></table></div><div class="actions"><button type="button" class="btn" id="reqAgain">Send another request</button></div>`;
+    r.querySelector("#reqAgain").onclick=()=>{ r.hidden=true; $("#reqForm").hidden=false; };
+    $("#reqForm").hidden=true; showMsg("#reqMsg","");
+    resetPeopleForm();
     loadAll();
   }catch(err){ showMsg("#reqMsg", err.message||"Could not send. Try again.", "err"); }
   finally{ btn.disabled=false; }

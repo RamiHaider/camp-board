@@ -38,6 +38,7 @@ create table if not exists stays (
   depart date not null,
   notes text not null default '',
   bed text,
+  requester_email text,
   status text not null default 'requested'
     check (status in ('requested','assigned','checked_out','declined')),
   created_at timestamptz not null default now(),
@@ -84,11 +85,12 @@ create policy anon_read_companies on companies for select to anon, authenticated
 
 -- anyone: submit a request. This is the ONLY write path for requesters.
 create or replace function submit_request(
-  p_name text, p_company text, p_arrive date, p_depart date, p_notes text default ''
+  p_email text, p_name text, p_company text, p_arrive date, p_depart date, p_notes text default ''
 ) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid;
 begin
+  if trim(coalesce(p_email,'')) !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'A valid email is required'; end if;
   if length(trim(coalesce(p_name,''))) < 2 then raise exception 'Name is required'; end if;
   if length(trim(coalesce(p_company,''))) < 1 then raise exception 'Company is required'; end if;
   if p_depart < p_arrive then raise exception 'Departure must be on or after arrival'; end if;
@@ -96,13 +98,13 @@ begin
     raise exception 'Too many requests right now, try later';
   end if;
   insert into companies (name) values (trim(p_company)) on conflict (lower(name)) do nothing;
-  insert into stays (name, company, arrive, depart, notes)
-    values (left(trim(p_name),120), left(trim(p_company),80), p_arrive, p_depart, left(coalesce(p_notes,''),500))
+  insert into stays (name, company, arrive, depart, notes, requester_email)
+    values (left(trim(p_name),120), left(trim(p_company),80), p_arrive, p_depart, left(coalesce(p_notes,''),500), lower(trim(p_email)))
     returning id into v_id;
   return v_id;
 end $$;
-revoke all on function submit_request(text,text,date,date,text) from public;
-grant execute on function submit_request(text,text,date,date,text) to anon, authenticated;
+revoke all on function submit_request(text,text,text,date,date,text) from public;
+grant execute on function submit_request(text,text,text,date,date,text) to anon, authenticated;
 
 -- live updates for the admin board
 do $$ begin
