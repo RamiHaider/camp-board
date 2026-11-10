@@ -120,3 +120,14 @@ exception when duplicate_object then null; end $$;
 -- tighten grants flagged by the security advisor
 revoke execute on function is_admin() from anon, public;
 revoke execute on function rls_auto_enable() from anon, authenticated, public;
+
+-- ---------- notifications (see supabase/functions/notify) ----------
+create extension if not exists pg_net with schema extensions;
+alter table stays add column if not exists req_arrive date;
+alter table stays add column if not exists req_depart date;
+alter table settings add column if not exists hook_secret text not null default encode(gen_random_bytes(24),'hex');
+alter table settings add column if not exists notify_url text not null default 'https://dppmbpcbglloitnfkyaw.supabase.co/functions/v1/notify';
+-- submit_request also fills req_arrive/req_depart (original request) — see migration "notifications".
+-- Trigger notify_stay() posts {event, stay_id, old} to notify_url with header x-camp-hook = settings.hook_secret
+-- on: insert (requested), status -> assigned, bed/date change while assigned (changed), status -> declined.
+-- Edge Function secret needed: RESEND_API_KEY. From address noreply@mgmcamp.com (domain verified in Resend).
