@@ -84,6 +84,7 @@ drop policy if exists anon_read_companies on companies;
 create policy anon_read_companies on companies for select to anon, authenticated using (true);
 
 -- anyone: submit a request. This is the ONLY write path for requesters.
+-- A typed company is stored on the request only; the public dropdown (companies) is admin-managed.
 create or replace function submit_request(
   p_email text, p_name text, p_company text, p_arrive date, p_depart date, p_notes text default ''
 ) returns uuid
@@ -97,7 +98,6 @@ begin
   if (select count(*) from stays where created_at > now() - interval '1 hour' and status = 'requested') > 200 then
     raise exception 'Too many requests right now, try later';
   end if;
-  insert into companies (name) values (trim(p_company)) on conflict (lower(name)) do nothing;
   insert into stays (name, company, arrive, depart, notes, requester_email)
     values (left(trim(p_name),120), left(trim(p_company),80), p_arrive, p_depart, left(coalesce(p_notes,''),500), lower(trim(p_email)))
     returning id into v_id;
