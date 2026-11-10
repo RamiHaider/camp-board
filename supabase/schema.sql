@@ -8,10 +8,9 @@ create table if not exists admins (
   added_at timestamptz not null default now()
 );
 
--- Single-row settings. request_code is the short code requesters type (posted on the kitchen wall).
+-- Single-row settings (reserved for future options).
 create table if not exists settings (
   id text primary key default 'main' check (id = 'main'),
-  request_code text not null default 'CAMP',
   updated_at timestamptz not null default now()
 );
 insert into settings (id) values ('main') on conflict do nothing;
@@ -71,16 +70,13 @@ drop policy if exists admin_all on stays;     create policy admin_all on stays  
 drop policy if exists anon_read_companies on companies;
 create policy anon_read_companies on companies for select to anon, authenticated using (true);
 
--- anyone with the camp code: submit a request. This is the ONLY write path for requesters.
+-- anyone: submit a request. This is the ONLY write path for requesters.
 create or replace function submit_request(
-  p_code text, p_name text, p_company text, p_arrive date, p_depart date, p_notes text default ''
+  p_name text, p_company text, p_arrive date, p_depart date, p_notes text default ''
 ) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid;
 begin
-  if not exists (select 1 from settings where id = 'main' and upper(request_code) = upper(trim(coalesce(p_code,'')))) then
-    raise exception 'Wrong camp code' using errcode = '28000';
-  end if;
   if length(trim(coalesce(p_name,''))) < 2 then raise exception 'Name is required'; end if;
   if length(trim(coalesce(p_company,''))) < 1 then raise exception 'Company is required'; end if;
   if p_depart < p_arrive then raise exception 'Departure must be on or after arrival'; end if;
@@ -93,8 +89,8 @@ begin
     returning id into v_id;
   return v_id;
 end $$;
-revoke all on function submit_request(text,text,text,date,date,text) from public;
-grant execute on function submit_request(text,text,text,date,date,text) to anon, authenticated;
+revoke all on function submit_request(text,text,date,date,text) from public;
+grant execute on function submit_request(text,text,date,date,text) to anon, authenticated;
 
 -- live updates for the admin board
 do $$ begin

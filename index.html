@@ -205,7 +205,6 @@ th{color:var(--muted);font-weight:500;font-size:12px}
             <div class="field"><label for="rDepart">Departure</label><input type="date" id="rDepart" required></div>
           </div>
           <div class="field"><label for="rNotes">Notes (role, preferences, anything useful)</label><textarea id="rNotes" maxlength="500"></textarea></div>
-          <div class="field"><label for="rCode">Camp code</label><input id="rCode" required autocomplete="off" autocapitalize="characters" placeholder="Ask at camp or check the kitchen wall"></div>
           <div class="actions"><button class="btn primary" type="submit" id="rSend">Send request</button></div>
           <div id="reqMsg" class="msg" hidden></div>
         </form>
@@ -226,8 +225,7 @@ th{color:var(--muted);font-weight:500;font-size:12px}
         <div class="form" id="adminPanel" hidden>
           <h2>Admin</h2>
           <p class="note" id="whoami"></p>
-          <div class="field"><label for="sCode">Camp code requesters must type</label><input id="sCode" autocapitalize="characters" maxlength="24"></div>
-          <div class="actions"><button class="btn primary" id="sSaveCode">Save code</button><button class="btn" id="btnLogout">Sign out</button></div>
+          <div class="actions"><button class="btn" id="btnLogout">Sign out</button></div>
           <div id="adminMsg" class="msg" hidden></div>
         </div>
       </section>
@@ -476,7 +474,6 @@ function renderAdminPanel(){
   $("#adminPanel").hidden = !isAdmin;
   if (isAdmin){
     $("#whoami").textContent = `Signed in as ${session?.user?.email||""}.`;
-    if (settings && document.activeElement!==$("#sCode")) $("#sCode").value = settings.request_code||"";
   }
 }
 
@@ -626,14 +623,13 @@ $("#reqForm").onsubmit=async e=>{
   e.preventDefault();
   const btn=$("#rSend"); btn.disabled=true;
   try{
-    const name=$("#rName").value.trim(), company=$("#rCompany").value.trim(), arrive=$("#rArrive").value, depart=$("#rDepart").value, notes=$("#rNotes").value.trim(), code=$("#rCode").value.trim();
+    const name=$("#rName").value.trim(), company=$("#rCompany").value.trim(), arrive=$("#rArrive").value, depart=$("#rDepart").value, notes=$("#rNotes").value.trim();
     if(depart<arrive) throw new Error("Departure must be on or after arrival.");
-    const {error} = await sb.rpc("submit_request",{p_code:code,p_name:name,p_company:company,p_arrive:arrive,p_depart:depart,p_notes:notes});
-    if (error) throw new Error(error.message.includes("camp code") ? "Wrong camp code. Ask at camp." : error.message);
+    const {error} = await sb.rpc("submit_request",{p_name:name,p_company:company,p_arrive:arrive,p_depart:depart,p_notes:notes});
+    if (error) throw new Error(error.message);
     showMsg("#reqMsg", `Request sent for ${name}, ${fmt(arrive)} to ${fmt(depart)}. The camp admin will assign a bed.`, "ok");
-    const keepCode=code; e.target.reset(); $("#rArrive").value=today(); $("#rDepart").value=addDays(today(),14); $("#rCode").value=keepCode;
-    try{ localStorage.setItem("campCode", keepCode); }catch(_){}
-    if (isAdmin) loadAll(); else loadAll();
+    e.target.reset(); $("#rArrive").value=today(); $("#rDepart").value=addDays(today(),14);
+    loadAll();
   }catch(err){ showMsg("#reqMsg", err.message||"Could not send. Try again.", "err"); }
   finally{ btn.disabled=false; }
 };
@@ -652,11 +648,6 @@ $("#lReset").onclick=async()=>{
   showMsg("#loginMsg", error?error.message:"Check your email for a reset link.", error?"err":"ok");
 };
 $("#btnLogout").onclick=()=>sb.auth.signOut();
-$("#sSaveCode").onclick=async()=>{
-  const code=$("#sCode").value.trim().toUpperCase(); if(code.length<3) return showMsg("#adminMsg","Code must be at least 3 characters.","err");
-  const {error} = await sb.from("settings").upsert({id:"main",request_code:code,updated_at:new Date().toISOString()});
-  showMsg("#adminMsg", error?error.message:"Camp code saved.", error?"err":"ok"); if(!error) loadAll();
-};
 sb.auth.onAuthStateChange(async (event, s) => {
   session = s;
   if (event==="PASSWORD_RECOVERY"){ const np=prompt("Choose a new password (8+ characters):"); if(np){ const {error}=await sb.auth.updateUser({password:np}); toast(error?error.message:"Password updated"); } }
@@ -670,7 +661,6 @@ sb.auth.onAuthStateChange(async (event, s) => {
 
 /* ---- boot ---- */
 const t0=today(); $("#rArrive").value=t0; $("#rDepart").value=addDays(t0,14);
-try{ const c=localStorage.getItem("campCode"); if(c) $("#rCode").value=c; }catch(_){}
 if (SUPABASE_URL.startsWith("__")) setStatus("This page is not connected to a database yet.", "err");
 render();
 })();
