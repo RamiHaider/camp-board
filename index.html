@@ -3,25 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Camp Bed Board</title>
+<title>MGM Camp Board</title>
+<link rel="icon" type="image/png" href="assets/leaf.png">
+<link rel="apple-touch-icon" href="assets/leaf.png">
+<meta name="theme-color" content="#121212">
 <meta name="color-scheme" content="light dark">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
 :root{
-  --bg:#f3f5f4; --surface:#ffffff; --surface-2:#e9edeb; --line:#cfd6d2; --fg:#182420; --muted:#5d6b66;
-  --accent:#1f6f5b; --accent-fg:#ffffff;
+  --bg:#f6f4ef; --surface:#ffffff; --surface-2:#eeeae0; --line:#d9d3c4; --fg:#1c1a16; --muted:#6a6457;
+  --accent:#a8842f; --accent-fg:#ffffff; --gold:#d7b973; --header:#121212; --header-fg:#f5f1e6;
   --free:#3d9a6a; --warn:#d49a1b; --bad:#c6453d; --reserved:#6b7cc7; --pending:#8a63c9;
-  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font:"Lato",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
   --shadow:0 8px 24px rgba(20,40,32,.12);
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#141a18; --surface:#1d2522; --surface-2:#273029; --line:#36423d; --fg:#e8ede9; --muted:#9aa8a1;
-  --accent:#4fb08f; --accent-fg:#0f1a15; --free:#4fb87f; --warn:#e0b040; --bad:#e2655c; --reserved:#8d9be0; --pending:#a98ae0;
+  --bg:#161513; --surface:#1f1d1a; --surface-2:#2a2723; --line:#3b3732; --fg:#ece7da; --muted:#a39c8c;
+  --accent:#d7b973; --accent-fg:#1a1508; --gold:#d7b973; --header:#0d0d0d; --header-fg:#f5f1e6; --free:#4fb87f; --warn:#e0b040; --bad:#e2655c; --reserved:#8d9be0; --pending:#a98ae0;
   --shadow:0 8px 24px rgba(0,0,0,.45); color-scheme:dark } }
 :root[data-theme="dark"]{
-  --bg:#141a18; --surface:#1d2522; --surface-2:#273029; --line:#36423d; --fg:#e8ede9; --muted:#9aa8a1;
-  --accent:#4fb08f; --accent-fg:#0f1a15; --free:#4fb87f; --warn:#e0b040; --bad:#e2655c; --reserved:#8d9be0; --pending:#a98ae0;
+  --bg:#161513; --surface:#1f1d1a; --surface-2:#2a2723; --line:#3b3732; --fg:#ece7da; --muted:#a39c8c;
+  --accent:#d7b973; --accent-fg:#1a1508; --gold:#d7b973; --header:#0d0d0d; --header-fg:#f5f1e6; --free:#4fb87f; --warn:#e0b040; --bad:#e2655c; --reserved:#8d9be0; --pending:#a98ae0;
   --shadow:0 8px 24px rgba(0,0,0,.45); color-scheme:dark }
 
 *{box-sizing:border-box}
@@ -30,28 +33,29 @@ body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 h1,h2,h3{margin:0;text-wrap:balance;line-height:1.2}
-h1{font-size:17px;font-weight:600}
+h1{font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--header-fg)}
+h1 small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.18em;color:var(--gold);margin-top:1px}
 h2{font-size:15px;font-weight:600}
 h3{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .num{font-variant-numeric:tabular-nums}
 .wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 [hidden]{display:none!important}
 
-.top{position:sticky;top:0;z-index:9;background:var(--surface);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.top{position:sticky;top:0;z-index:9;background:var(--header);border-bottom:2px solid var(--gold);padding-top:env(safe-area-inset-top,0px)}
 .top .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px}
 .brand{display:flex;align-items:center;gap:10px}
-.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.brand img{width:30px;height:30px;object-fit:contain}
 nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;align-items:center}
-nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:6px;font-weight:500}
-nav a[aria-current="page"]{color:var(--fg);background:var(--surface-2)}
-nav a:hover{color:var(--fg)}
-.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--pending);color:#fff;font-size:11px;font-weight:600;margin-left:6px}
+nav a{text-decoration:none;color:#b9b3a4;padding:6px 10px;border-radius:6px;font-weight:700;font-size:13px;letter-spacing:.02em}
+nav a[aria-current="page"]{color:var(--gold);background:rgba(215,185,115,.12)}
+nav a:hover{color:var(--header-fg)}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--gold);color:#1a1508;font-size:11px;font-weight:600;margin-left:6px}
 
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding-block:14px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .stat .v{font-size:22px;font-weight:600}
 .stat .l{font-size:12px;color:var(--muted)}
-.stat.free .v{color:var(--free)} .stat.leaving .v{color:var(--warn)} .stat.pending .v{color:var(--pending)} .stat.overdue .v{color:var(--bad)}
+.stat.free .v{color:var(--free)} .stat.leaving .v{color:var(--warn)} .stat.pending .v{color:var(--accent)} .stat.overdue .v{color:var(--bad)}
 
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 12px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
 .btn:hover{background:var(--surface-2)}
@@ -146,7 +150,7 @@ th{color:var(--muted);font-weight:500;font-size:12px}
 
 <div class="top wrap">
   <div class="row">
-    <div class="brand"><span class="dot"></span><h1>Camp Bed Board</h1></div>
+    <div class="brand"><img src="assets/leaf.png" alt=""><h1>Maple Gold Mines<small>Camp Board</small></h1></div>
     <nav id="nav">
       <a href="#map" data-view="map" class="adminonly">Map</a>
       <a href="#people" data-view="people" class="adminonly">People<span class="badge" id="pendBadge" hidden>0</span></a>
