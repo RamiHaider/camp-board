@@ -149,11 +149,13 @@ th{color:var(--muted);font-weight:500;font-size:12px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;z-index:30;box-shadow:var(--shadow)}
 
 /* ---- floor plan (rotated: front/kitchen at the left, north at the right) ---- */
-.plan{display:flex;gap:12px;align-items:flex-start;overflow-x:auto;padding:26px 2px 26px}
+.plan{display:flex;flex-direction:column;gap:30px;align-items:flex-start;overflow-x:auto;padding:26px 2px 26px}
+.plan .mainrow{display:flex;gap:6px;align-items:stretch}
+.plan .annexrow{margin-left:160px}
 .front{align-self:stretch;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;background:var(--surface-2);border:2px solid var(--line);border-radius:8px;padding:10px 8px;min-width:88px;text-align:center;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;flex:none}
 .front b{font-size:12px;color:var(--fg);letter-spacing:.14em}
 .front .arrow{font-size:18px;color:var(--accent);line-height:1}
-.bldg{display:flex;flex-direction:column;gap:22px;flex:none}
+
 .bld{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:6px;background:var(--surface);flex:none;position:relative}
 .bld .cap{position:absolute;left:0;top:-18px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
 .bld .rw{display:flex}
@@ -542,10 +544,10 @@ function renderPlan(host, modeStay, hasFilter){
   // rotated 90 degrees to the right: west wall on top, east wall below, south end (kitchen) at the left
   const main = `<div class="bld"><span class="cap">Main camp · rooms 37 to 92</span>${row([...PLAN_WEST].reverse(),"n")}<div class="corr"><span>corridor</span></div>${row([...PLAN_EAST].reverse(),"s")}</div>`;
   const annex = `<div class="bld"><span class="cap">Bloc B (top) · Bloc A (bottom)</span>${row([...PLAN_BLOC_B].reverse(),"n")}<div class="corr"><span class="exit">EXIT</span><span>corridor</span><span class="exit">EXIT</span></div>${row([...PLAN_BLOC_A].reverse(),"s")}</div>`;
-  const front = `<div class="front"><span class="arrow">&#9656;</span><b>Front</b><span>Kitchen<br>Deck</span><span>entrance</span></div>`;
+  const front = `<div class="front"><span class="arrow">&#9656;</span><b>Front</b><span>Kitchen</span><span>entrance</span></div>`;
   const others=[]; layout.sections.forEach(sec=>sec.rooms.forEach(r=>{ if(!used.has(r.id)) others.push({sec,r}); }));
   const otherHtml = others.length ? `<div class="section" style="margin-top:12px"><header><h2>Other rooms</h2><span class="cnt">not on the drawing</span></header><div class="rooms">${others.map(({sec,r})=>{ let b=""; for(let i=1;i<=r.beds;i++) b+=bedBtn(bedKey(sec.id,r.id,i),modeStay,hasFilter); return `<div class="room"><div class="rn"><span>${esc(sec.name)} · ${esc(r.name)}</span></div>${b}</div>`; }).join("")}</div></div>` : "";
-  host.innerHTML = `<div class="plan">${front}<div class="bldg">${main}${annex}</div></div>${otherHtml}${rosterHtml()}`;
+  host.innerHTML = `<div class="plan"><div class="annexrow">${annex}</div><div class="mainrow">${front}${main}</div></div>${otherHtml}${rosterHtml()}`;
   host.querySelectorAll(".bed").forEach(b => b.onclick = () => onBedClick(b.dataset.bed));
   wireRoster(host);
   const selCell = host.querySelector(".cell.sel"); if (selCell) selCell.scrollIntoView({inline:"nearest", block:"nearest"});
