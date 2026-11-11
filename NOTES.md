@@ -20,6 +20,13 @@ Seeded 2026-11-10 from the MGM `Project Invoicing/2026` vendor folders: Maple Go
 - Secret: `RESEND_API_KEY` in Supabase Edge Function secrets (key `camp-board-send`, sending only). Trigger↔function shared secret lives in `settings.hook_secret`.
 - Debug: `select * from net._http_response order by id desc` shows each call; function logs show Resend errors.
 
+## Layout and occupants loaded from the camp register (2026-11-11)
+Source: "Registre des occupants" PDF dated 10-11-2026 from the camp. Rooms are one bed each: 37-62, 63-92 (only the numbers that appear on the register; 38, 66, 68, 70-72, 74, 76, 78, 91 are not listed), A1-A5, B1-B6. Four sections on the map: Rooms 37-62, Rooms 63-92, A rooms, B rooms. Adjust in Edit layout if the real camp differs (add beds per room, add the missing numbers).
+- Register company codes mapped: SPEKTRA = Forage Spektra, MAPLE = Maple Gold Mines, FORAGE FTE = FTE Drilling, LAURENTIA = Laurentia Exploration. CINO and L'Hôte added to the dropdown.
+- Jour/Nuit column kept as "Day shift" / "Night shift" at the start of each person's notes. "CM" suffix on a name moved to notes.
+- Unknown departures (???, "Jamais", blank) got placeholder dates and a note saying so; weekly commuters (Lundi au Mercredi / Jeudi) got this week's dates and a "Weekly, …" note. Fix from the bed drawer when the real dates are known.
+- The two one-night stays from the footnote (rooms 87 and 90 on Nov 10) are in History.
+
 ## Known limits
 - Free Supabase projects pause after 7 days with no traffic; click Restore in the dashboard.
 - GitHub Pages caches the page for ~10 minutes; hard refresh (Ctrl+Shift+R) after a deploy.
