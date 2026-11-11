@@ -525,7 +525,8 @@ function bedBtn(key, modeStay, hasFilter){
   return `<button type="button" class="${cls}" data-bed="${key}" ${stripe} aria-label="${esc(bedLabel(key))}"><span class="n">${esc(name)}</span></button>`;
 }
 function planCell(entry, idx, modeStay, hasFilter, used){
-  if (typeof entry==="string") return `<div class="cell svc">${esc(entry)}</div>`;
+  const isRoom = typeof entry==="number" || /^[A-Z]{1,2}\d+$/.test(entry);
+  if (!isRoom) return `<div class="cell svc">${esc(entry)}</div>`;
   const name=String(entry); const hit=idx.get(name.toUpperCase());
   if (!hit) return `<div class="cell svc missing" title="Room ${esc(name)} is not in the layout. Add it with Edit layout.">${esc(name)}</div>`;
   used.add(hit.room.id);
