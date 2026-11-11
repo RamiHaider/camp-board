@@ -27,6 +27,10 @@ Source: "Registre des occupants" PDF dated 10-11-2026 from the camp. Rooms are o
 - Unknown departures (???, "Jamais", blank) got placeholder dates and a note saying so; weekly commuters (Lundi au Mercredi / Jeudi) got this week's dates and a "Weekly, …" note. Fix from the bed drawer when the real dates are known.
 - The two one-night stays from the footnote (rooms 87 and 90 on Nov 10) are in History.
 
+## Map = real floor plan (2026-11-11)
+The Map tab draws the camp from the hand drawing, rotated 90 degrees to the right: the front (kitchen and deck) is at the left, room 37 at the far right. West wall (even rooms) on top, east wall (odd rooms) below, corridor between. Bloc B / Bloc A is the small building underneath with its two exits. The plan is a constant in `index.html` (`PLAN_WEST`, `PLAN_EAST`, `PLAN_BLOC_B`, `PLAN_BLOC_A`): room names there must match room names in the layout. A layout room not on the drawing shows under "Other rooms"; a drawing room not in the layout shows greyed with a tooltip. Edit layout still works (beds per room, names) and uses the old card view while editing.
+Under the plan: "People in camp" roster with a search box (name, company, room, notes). Click a row to light the room up with an arrow; click a room to light up the row. Hover a bed for the details card.
+
 ## Known limits
 - Free Supabase projects pause after 7 days with no traffic; click Restore in the dashboard.
 - GitHub Pages caches the page for ~10 minutes; hard refresh (Ctrl+Shift+R) after a deploy.

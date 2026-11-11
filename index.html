@@ -147,6 +147,55 @@ th{color:var(--muted);font-weight:500;font-size:12px}
 .setup{max-width:560px;margin:40px auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:14px}
 .setup ol{margin:0;padding-left:20px;color:var(--muted)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;z-index:30;box-shadow:var(--shadow)}
+
+/* ---- floor plan (rotated: front/kitchen at the left, north at the right) ---- */
+.plan{display:flex;gap:12px;align-items:flex-start;overflow-x:auto;padding:26px 2px 26px}
+.front{align-self:stretch;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;background:var(--surface-2);border:2px solid var(--line);border-radius:8px;padding:10px 8px;min-width:88px;text-align:center;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;flex:none}
+.front b{font-size:12px;color:var(--fg);letter-spacing:.14em}
+.front .arrow{font-size:18px;color:var(--accent);line-height:1}
+.bldg{display:flex;flex-direction:column;gap:22px;flex:none}
+.bld{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:6px;background:var(--surface);flex:none;position:relative}
+.bld .cap{position:absolute;left:0;top:-18px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
+.bld .rw{display:flex}
+.bld .corr{height:20px;background:var(--surface-2);display:flex;align-items:center;justify-content:space-around;font-size:8.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted)}
+.exit{font-size:8px;font-weight:900;color:#fff;background:var(--bad);padding:1px 5px;border-radius:3px;letter-spacing:.12em}
+.cell{position:relative;width:58px;min-height:48px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:2px;padding:3px;flex:none;background:var(--surface)}
+.rw .cell:last-child{border-right:0}
+.rw.n .cell{border-bottom:1px solid var(--line)} .rw.s .cell{border-top:1px solid var(--line)}
+.cell.svc{justify-content:center;align-items:center;text-align:center;background:var(--surface-2);color:var(--muted);font-size:7.5px;letter-spacing:.04em;text-transform:uppercase;line-height:1.1;padding:2px;background-image:repeating-linear-gradient(135deg,transparent 0 5px,rgba(0,0,0,.05) 5px 6px)}
+.cell.missing{font-family:var(--mono);font-size:11px;opacity:.6}
+.cell .rn{font-family:var(--mono);font-size:10.5px;color:var(--muted);line-height:1;display:flex;justify-content:space-between;align-items:baseline}
+.cell .rn small{font-family:var(--font);font-size:7.5px;text-transform:uppercase;letter-spacing:.04em}
+.cell.sel{outline:2px solid var(--accent);outline-offset:-2px;z-index:1}
+.plan .bed{min-height:22px;padding:2px 4px;border-left-width:4px;border-radius:4px;flex:1;gap:0}
+.plan .bed .n{font-size:10px;font-weight:600;padding-right:8px}
+.plan .bed .s{display:none}
+.plan .bed.free .n{font-size:9px;font-weight:500}
+.plan .bed.free::after{content:"";position:absolute;border-radius:50%;background:var(--free)}
+.plan .bed.free::after,.plan .bed.leaving::after,.plan .bed.overdue::after{top:3px;right:3px;width:7px;height:7px}
+.ptr{position:absolute;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--accent-fg);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;z-index:3;pointer-events:none}
+.ptr::after{content:"";position:absolute;left:50%;transform:translateX(-50%);border:5px solid transparent}
+.rw.n .ptr{bottom:calc(100% + 7px)} .rw.n .ptr::after{top:100%;border-top-color:var(--accent)}
+.rw.s .ptr{top:calc(100% + 7px)} .rw.s .ptr::after{bottom:100%;border-bottom-color:var(--accent)}
+.legend{flex-direction:column;gap:6px}
+.legend .lrow{display:flex;gap:14px;flex-wrap:wrap}
+.legend .dot i{border-radius:50%}
+.tip{position:fixed;z-index:40;pointer-events:none;background:var(--header);color:var(--header-fg);padding:7px 10px;border-radius:6px;font-size:12px;line-height:1.35;max-width:250px;box-shadow:var(--shadow);border-top:2px solid var(--gold)}
+.tip b{font-size:13px} .tip .m{color:#cfc7b4}
+.roster{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-top:4px;overflow:hidden}
+.roster .rhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+.roster .rhead input{max-width:300px;padding:6px 9px}
+.roster .rhead .cnt{color:var(--muted);font-size:12.5px;margin-left:auto}
+.roster .rows{max-height:460px;overflow-y:auto}
+.roster .grp{position:sticky;top:0;background:var(--surface-2);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:6px 12px;font-weight:700;z-index:1}
+.roster .row{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);cursor:pointer;border-left:4px solid var(--c,transparent)}
+.roster .row:hover,.roster .row.sel{background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
+.roster .row .r{font-family:var(--mono);font-size:12px}
+.roster .row .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.roster .row .nm small{display:block;color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
+.roster .row .dt{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.roster .row .dt.soon{color:var(--warn)} .roster .row .dt.over{color:var(--bad)}
+.roster .empty{padding:12px}
 </style>
 </head>
 <body>
@@ -188,13 +237,7 @@ th{color:var(--muted);font-weight:500;font-size:12px}
         </div>
         <div id="modebar" class="modebar" hidden></div>
         <div id="sections" class="sections"></div>
-        <div class="legend">
-          <span><i style="background:var(--free)"></i>Free</span>
-          <span><i style="background:var(--line)"></i>Occupied (color = company)</span>
-          <span><i style="background:var(--reserved)"></i>Reserved, arriving later</span>
-          <span><i style="background:var(--warn);border-radius:50%"></i>Leaving within 48 h</span>
-          <span><i style="background:var(--bad);border-radius:50%"></i>Past departure date</span>
-        </div>
+        <div class="legend" id="legend"></div>
       </section>
 
       <section class="view" id="view-people" hidden>
@@ -247,6 +290,7 @@ th{color:var(--muted);font-weight:500;font-size:12px}
     <aside class="drawer" id="drawer" hidden></aside>
   </main>
 </div>
+<div id="tip" class="tip" hidden></div>
 <div id="toast" class="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
@@ -268,6 +312,14 @@ let layout = null, stays = [], companies = [], settings = null;
 let mode = null, selectedBed = null, drawerKind = null;
 let editing = false, editLayout = null, addDefaults = null;
 let filter = {from:"", to:""};
+let listQuery = "";
+/* Floor plan, from the camp drawing. Strings are service rooms, numbers/codes are room names in the layout.
+   Listed north to south as drawn; the map is rotated so the front (kitchen) sits at the left. */
+const PLAN_WEST = ["Storage",40,42,44,"Furnace",46,48,50,52,54,56,58,"Furnace",60,62,64,"Bathroom","Bathroom","Laundry","Electrical room",80,82,84,86,"Furnace",88,90,92];
+const PLAN_EAST = [37,39,41,"Furnace",43,45,47,49,51,53,55,"Furnace",57,59,61,63,65,67,69,"Furnace","Infirmerie",73,75,77,79,81,83,"Furnace",85,87,89,"Visiteur"];
+const PLAN_BLOC_B = ["B1","B2","B3","B4","B5","B6","Toilet · Shower"];
+const PLAN_BLOC_A = ["A1","A2","A3","Toilet · Shower · Laundry","A4","A5"];
+const PLAN_NOTES = {73:"clinic"};
 let loaded = false;
 
 /* ---- dates ---- */
@@ -406,6 +458,7 @@ function renderMap(){
   $("#fClear").hidden = !hasFilter;
   const modeStay = mode ? stays.find(x=>x.id===mode.stayId) : null;
 
+  if (!editing){ renderPlan(host, modeStay, hasFilter); return; }
   host.innerHTML = L.sections.map(sec => {
     const bedCount = sec.rooms.reduce((a,r)=>a+Number(r.beds||0),0);
     let free=0; sec.rooms.forEach(r=>{for(let i=1;i<=r.beds;i++) if(!bedInfo(bedKey(sec.id,r.id,i)).now) free++;});
@@ -456,6 +509,80 @@ function renderMap(){
     host.querySelectorAll(".bed").forEach(b => b.onclick = () => onBedClick(b.dataset.bed));
   }
 }
+
+/* ---- floor plan render ---- */
+function roomIndex(){ const m=new Map(); (layout?.sections||[]).forEach(sec=>sec.rooms.forEach(room=>m.set(String(room.name).trim().toUpperCase(),{sec,room}))); return m; }
+function roomNameOf(key){ if(!key||!layout) return ""; const [s,r]=key.split("/"); return layout.sections.find(x=>x.id===s)?.rooms.find(x=>x.id===r)?.name||""; }
+function bedBtn(key, modeStay, hasFilter){
+  const {now,next}=bedInfo(key);
+  let cls="bed", name="Free", stripe="";
+  if (now){ cls+=" "+now.st; name=now.name.split(" ")[0]; stripe=`style="border-left-color:${esc(companyColor(now.company))}"`; }
+  else if (next){ cls+=" reserved"; name="Reserved"; }
+  else cls+=" free";
+  if (modeStay){ const ok = modeStay.bed!==key && freeBetween(key, modeStay.arrive, modeStay.depart); cls += ok?" target":" dim"; }
+  else if (hasFilter){ cls += freeBetween(key, filter.from, filter.to) ? " target" : " dim"; }
+  if (selectedBed===key) cls+=" selected";
+  return `<button type="button" class="${cls}" data-bed="${key}" ${stripe} aria-label="${esc(bedLabel(key))}"><span class="n">${esc(name)}</span></button>`;
+}
+function planCell(entry, idx, modeStay, hasFilter, used){
+  if (typeof entry==="string") return `<div class="cell svc">${esc(entry)}</div>`;
+  const name=String(entry); const hit=idx.get(name.toUpperCase());
+  if (!hit) return `<div class="cell svc missing" title="Room ${esc(name)} is not in the layout. Add it with Edit layout.">${esc(name)}</div>`;
+  used.add(hit.room.id);
+  let beds=""; for(let i=1;i<=hit.room.beds;i++) beds+=bedBtn(bedKey(hit.sec.id,hit.room.id,i), modeStay, hasFilter);
+  const sel = !!selectedBed && selectedBed.startsWith(`${hit.sec.id}/${hit.room.id}/`);
+  let ptr=""; if (sel){ const {now}=bedInfo(selectedBed); ptr=`<span class="ptr">${now?esc(now.name.split(" ")[0]):"here"}</span>`; }
+  const note = PLAN_NOTES[name] ? `<small>${esc(PLAN_NOTES[name])}</small>` : "";
+  return `<div class="cell${sel?" sel":""}" data-room="${esc(name)}">${ptr}<span class="rn"><span>${esc(name)}</span>${note}</span>${beds}</div>`;
+}
+function renderPlan(host, modeStay, hasFilter){
+  const idx=roomIndex(), used=new Set();
+  const row=(list,side)=>`<div class="rw ${side}">${list.map(e=>planCell(e, idx, modeStay, hasFilter, used)).join("")}</div>`;
+  // rotated 90 degrees to the right: west wall on top, east wall below, south end (kitchen) at the left
+  const main = `<div class="bld"><span class="cap">Main camp · rooms 37 to 92</span>${row([...PLAN_WEST].reverse(),"n")}<div class="corr"><span>corridor</span></div>${row([...PLAN_EAST].reverse(),"s")}</div>`;
+  const annex = `<div class="bld"><span class="cap">Bloc B (top) · Bloc A (bottom)</span>${row([...PLAN_BLOC_B].reverse(),"n")}<div class="corr"><span class="exit">EXIT</span><span>corridor</span><span class="exit">EXIT</span></div>${row([...PLAN_BLOC_A].reverse(),"s")}</div>`;
+  const front = `<div class="front"><span class="arrow">&#9656;</span><b>Front</b><span>Kitchen<br>Deck</span><span>entrance</span></div>`;
+  const others=[]; layout.sections.forEach(sec=>sec.rooms.forEach(r=>{ if(!used.has(r.id)) others.push({sec,r}); }));
+  const otherHtml = others.length ? `<div class="section" style="margin-top:12px"><header><h2>Other rooms</h2><span class="cnt">not on the drawing</span></header><div class="rooms">${others.map(({sec,r})=>{ let b=""; for(let i=1;i<=r.beds;i++) b+=bedBtn(bedKey(sec.id,r.id,i),modeStay,hasFilter); return `<div class="room"><div class="rn"><span>${esc(sec.name)} · ${esc(r.name)}</span></div>${b}</div>`; }).join("")}</div></div>` : "";
+  host.innerHTML = `<div class="plan">${front}<div class="bldg">${main}${annex}</div></div>${otherHtml}${rosterHtml()}`;
+  host.querySelectorAll(".bed").forEach(b => b.onclick = () => onBedClick(b.dataset.bed));
+  wireRoster(host);
+  const selCell = host.querySelector(".cell.sel"); if (selCell) selCell.scrollIntoView({inline:"nearest", block:"nearest"});
+  renderLegend();
+}
+function renderLegend(){
+  const cos = companies.map(c=>`<span><i style="background:${esc(c.color)}"></i>${esc(c.name)}</span>`).join("");
+  $("#legend").innerHTML = `<div class="lrow">${cos}<span><i style="background:var(--surface-2);border:1px solid var(--line)"></i>Service room</span><span><i style="background:var(--reserved)"></i>Reserved, arriving later</span></div>
+    <div class="lrow"><span class="dot"><i style="background:var(--free)"></i>Open, free room</span><span class="dot"><i style="background:var(--warn)"></i>Leaving in 1–2 days</span><span class="dot"><i style="background:var(--bad)"></i>Past departure date</span></div>`;
+}
+function rosterRows(){
+  const q=listQuery.trim().toLowerCase();
+  const list=stays.filter(s=>s.status==="assigned").map(s=>({...s, room:String(roomNameOf(s.bed)), st:stayState(s)}));
+  const ok=s=>!q || s.name.toLowerCase().includes(q) || s.company.toLowerCase().includes(q) || s.room.toLowerCase()===q || (s.notes||"").toLowerCase().includes(q);
+  const shown=list.filter(ok);
+  const groups={}; shown.forEach(s=>(groups[s.company]=groups[s.company]||[]).push(s));
+  const html=Object.entries(groups).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).map(([co,rows])=>`<div class="grp">${esc(co)} · ${rows.length}</div>`+rows.sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})).map(s=>`<div class="row${s.bed===selectedBed?" sel":""}" data-bed="${s.bed}" style="--c:${esc(companyColor(s.company))}"><span class="r">${esc(s.room)}</span><span class="nm">${esc(s.name)}${s.notes?`<small>${esc(s.notes)}</small>`:""}</span><span class="dt ${s.st==="leaving"?"soon":s.st==="overdue"?"over":""}">${fmt(s.arrive)} → ${fmt(s.depart)}</span></div>`).join("")).join("");
+  return {html: html || `<div class="empty">Nobody matches "${esc(listQuery)}".</div>`, n: shown.length, total: list.length};
+}
+function rosterHtml(){ const r=rosterRows(); return `<div class="roster"><div class="rhead"><h2>People in camp</h2><input id="rosterQ" type="search" placeholder="Search name, company or room" value="${esc(listQuery)}" autocomplete="off"><span class="cnt num">${r.n===r.total?r.total:r.n+" of "+r.total}</span></div><div class="rows">${r.html}</div></div>`; }
+function wireRoster(host){
+  const q=host.querySelector("#rosterQ"); const rows=host.querySelector(".roster .rows");
+  const wireRows=()=>rows.querySelectorAll(".row").forEach(r=>r.onclick=()=>{ onBedClick(r.dataset.bed); });
+  if (q) q.oninput=()=>{ listQuery=q.value; const r=rosterRows(); rows.innerHTML=r.html; host.querySelector(".roster .cnt").textContent = r.n===r.total?r.total:r.n+" of "+r.total; wireRows(); };
+  wireRows();
+}
+/* hover card on the plan */
+const tipEl=$("#tip");
+document.addEventListener("mouseover", e=>{
+  const b=e.target.closest(".plan .bed"); if(!b){ tipEl.hidden=true; return; }
+  const {now,next}=bedInfo(b.dataset.bed); const lbl=esc(bedLabel(b.dataset.bed));
+  tipEl.innerHTML = now ? `<b>${esc(now.name)}</b><br>${esc(now.company)} · ${lbl}<br><span class="m">${fmt(now.arrive)} → ${fmt(now.depart)} · ${daysUntil(now.depart)>=0?daysUntil(now.depart)+" days left":Math.abs(daysUntil(now.depart))+" days overdue"}</span>${now.notes?`<br><span class="m">${esc(now.notes)}</span>`:""}`
+    : next ? `<b>Reserved</b><br>${esc(next.name)} from ${fmt(next.arrive)}<br><span class="m">${lbl}</span>`
+    : `<b>${lbl}</b><br><span class="m">Open. Click to put someone here.</span>`;
+  tipEl.hidden=false;
+});
+document.addEventListener("mousemove", e=>{ if(tipEl.hidden) return; tipEl.style.left=Math.min(e.clientX+14, innerWidth-262)+"px"; tipEl.style.top=Math.min(e.clientY+14, innerHeight-100)+"px"; });
+document.addEventListener("click", ()=>{ tipEl.hidden=true; });
 
 function renderCompanyList(){
   const sel=$("#rCompany"); const cur=sel.value;
