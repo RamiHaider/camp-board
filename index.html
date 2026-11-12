@@ -430,6 +430,7 @@ function route(){
   let v = VIEWS.includes(h) ? h : home;
   if (["map","people","history"].includes(v) && !canBoard) v = home;
   if (v==="mine" && !isCompany) v = home;
+  if (h && h!==v) history.replaceState(null, "", "#"+v);
   VIEWS.forEach(x => { $("#view-"+x).hidden = x!==v; });
   document.querySelectorAll("#nav a").forEach(a => a.dataset.view===v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
   document.querySelectorAll(".adminonly").forEach(a => a.hidden = !canBoard);
