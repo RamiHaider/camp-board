@@ -40,6 +40,10 @@ Under the plan: "People in camp" roster with a search box (name, company, room, 
 - **Logins** (all portal logins are `<company>@mgmcamp.com`, not real inboxes, so no password reset; an admin rotates them in the database). Who has access is listed on the Admin tab. Adding a login = `members` row + auth user (see the create_login pattern used on 2026-11-12).
 - Maple Gold Mines has no company portal; MGM people are handled by admins.
 
+## Company map + French (2026-11-12, later)
+- A company login's home is the **Map**: its own people by name, every other occupied bed hatched grey as "Reserved" (no name, no company), free beds green. Data comes from `bed_occupancy()` (bed, arrive, depart only; members only). The roster, stats and "My people" lists show only the company's own people. No exports, no Add person.
+- **FR / EN button** in the header. The page is written in English; French is applied to the DOM after each render from the `FR` dictionary and `FR_RX` patterns in `index.html` (add new UI strings there, in both). Choice is remembered per browser; default follows the browser language. Dates follow the language. `notranslate` meta stops Chrome's Google Translate from fighting it.
+
 ## Known limits
 - Free Supabase projects pause after 7 days with no traffic; click Restore in the dashboard.
 - GitHub Pages caches the page for ~10 minutes; hard refresh (Ctrl+Shift+R) after a deploy.
