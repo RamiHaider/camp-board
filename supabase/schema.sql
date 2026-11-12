@@ -131,3 +131,43 @@ alter table settings add column if not exists notify_url text not null default '
 -- Trigger notify_stay() posts {event, stay_id, old} to notify_url with header x-camp-hook = settings.hook_secret
 -- on: insert (requested), status -> assigned, bed/date change while assigned (changed), status -> declined.
 -- Edge Function secret needed: RESEND_API_KEY. From address noreply@mgmcamp.com (domain verified in Resend).
+
+-- ---------- company portals + change requests (2026-11-12) ----------
+-- members.role gains 'company'; members.company names the company that login manages.
+alter table members drop constraint if exists admins_role_check;
+alter table members add column if not exists company text;
+create or replace function my_company() returns text
+language sql stable security definer set search_path = public as $$
+  select company from members where lower(email) = lower(coalesce(auth.jwt()->>'email','')) limit 1; $$;
+create or replace function is_company() returns boolean
+language sql stable security definer set search_path = public as $$ select coalesce(my_role() = 'company', false); $$;
+revoke all on function my_company() from public, anon; grant execute on function my_company() to authenticated;
+revoke all on function is_company() from public, anon; grant execute on function is_company() to authenticated;
+-- admins and viewers read every stay; a company login reads only its own company's stays
+drop policy if exists member_read on stays;
+create policy member_read on stays for select to authenticated
+  using (my_role() in ('admin','viewer') or (my_role() = 'company' and lower(company) = lower(coalesce(my_company(),''))));
+-- settings (holds hook_secret) is admin-only
+drop policy if exists member_read on settings;
+
+-- shift: day or night, asked on the request form, editable by admins
+alter table stays add column if not exists shift text not null default 'day' check (shift in ('day','night'));
+-- submit_request(p_email, p_name, p_company, p_arrive, p_depart, p_notes, p_shift default 'day') replaces the 6-arg version.
+
+-- a company asks to extend or move a stay; an admin approves (dates applied) or declines; both sides get email
+create table if not exists change_requests (
+  id uuid primary key default gen_random_uuid(),
+  stay_id uuid not null references stays(id) on delete cascade,
+  requested_by text not null,             -- contact email given by the company portal
+  new_arrive date not null, new_depart date not null,
+  note text not null default '',
+  status text not null default 'pending' check (status in ('pending','approved','declined')),
+  decision_note text not null default '',
+  created_at timestamptz not null default now(), decided_at timestamptz
+);
+alter table change_requests enable row level security;
+-- policies: admin_all (admins), company_read (own company's stays). Writes only through:
+--   request_change(p_stay, p_arrive, p_depart, p_email, p_note)  -- company (own stays) or admin; replaces an older pending one
+--   decide_change(p_id, p_approve, p_note)                       -- admin; approve applies the dates after a bed-clash check
+-- trigger change_requests_notify -> notify_change() posts change_requested / change_decided to the notify function.
+-- live definitions: migration applied 2026-11-12 through the Supabase MCP (see NOTES.md).

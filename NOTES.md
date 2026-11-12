@@ -31,6 +31,15 @@ Source: "Registre des occupants" PDF dated 10-11-2026 from the camp. Rooms are o
 The Map tab draws the camp from the hand drawing, rotated 90 degrees to the right: the front (kitchen and deck) is at the left, room 37 at the far right. West wall (even rooms) on top, east wall (odd rooms) below, corridor between. Bloc B / Bloc A is the small building underneath with its two exits. The plan is a constant in `index.html` (`PLAN_WEST`, `PLAN_EAST`, `PLAN_BLOC_B`, `PLAN_BLOC_A`): room names there must match room names in the layout. A layout room not on the drawing shows under "Other rooms"; a drawing room not in the layout shows greyed with a tooltip. Edit layout still works (beds per room, names) and uses the old card view while editing.
 Under the plan: "People in camp" roster with a search box (name, company, room, notes). Click a row to light the room up with an arrow; click a room to light up the row. Hover a bed for the details card.
 
+## Company portals, shifts, change requests, exports (2026-11-12)
+- **Roles** are now admin / viewer / company. A company login (`members.role = 'company'`, `members.company = name`) sees only its own company's people under "My people", can file new requests (company locked on the form) and **Change dates** requests, and nothing else. Row-level security enforces it; the page only hides buttons.
+- **Change requests** (`change_requests` table): a company picks new dates (quick +1 / +2 / +7 days), gives a contact email, sends. Admins see them at the top of People with Approve / Decline. Approve applies the dates to the stay (bed-clash checked), both sides get email. A newer request on the same stay replaces the older pending one.
+- **Shift** (`stays.shift`, day/night) is asked per person on the request form, shown as a chip everywhere, editable by admins in the bed drawer and the Edit-request drawer. Register import: people whose notes started "Night shift" were set to night (10 people).
+- **Notes** are editable by admins: bed drawer ("Save changes") and the Edit button on waiting requests.
+- **Exports** on the Map toolbar (admins and viewers): *Print floor plan* (every room in drawing order with name, company, shift, dates, notes, plus a full table and waiting requests; landscape, save as PDF from the print dialog), *Print departures* (per day, leaving and arriving by room, for the next 7 days or this/next Mon–Sun week; overdue list at the end), *CSV* of everyone in camp or waiting.
+- **Logins** (all portal logins are `<company>@mgmcamp.com`, not real inboxes, so no password reset; an admin rotates them in the database). Who has access is listed on the Admin tab. Adding a login = `members` row + auth user (see the create_login pattern used on 2026-11-12).
+- Maple Gold Mines has no company portal; MGM people are handled by admins.
+
 ## Known limits
 - Free Supabase projects pause after 7 days with no traffic; click Restore in the dashboard.
 - GitHub Pages caches the page for ~10 minutes; hard refresh (Ctrl+Shift+R) after a deploy.

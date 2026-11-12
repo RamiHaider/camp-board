@@ -1,6 +1,6 @@
 // Camp Board notifications. Called by the stays_notify database trigger (see supabase/schema.sql).
 // Sends: receipt to requester + heads-up to admins on a new request; confirmation to requester on
-// assignment or change; decline note. Secrets: RESEND_API_KEY (Edge Function secret).
+// assignment or change; decline note; date-change requests from company portals and their decisions. Secrets: RESEND_API_KEY (Edge Function secret).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SITE = "https://mgmcamp.com";
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   const { data: settings } = await sb.from("settings").select("hook_secret").eq("id", "main").single();
   if (!settings || req.headers.get("x-camp-hook") !== settings.hook_secret) return new Response("forbidden", { status: 403 });
 
-  const { event, stay_id, old } = await req.json();
+  const { event, stay_id, old, change_id } = await req.json();
   const [{ data: s }, { data: layoutRow }, { data: admins }] = await Promise.all([
     sb.from("stays").select("*").eq("id", stay_id).single(),
     sb.from("layout").select("sections").eq("id", "main").maybeSingle(),
@@ -63,9 +63,10 @@ Deno.serve(async (req) => {
   const layout = layoutRow ?? null;
   const adminTo = (admins ?? []).map((a: any) => a.email);
   const out: any[] = [];
+  const shift = s.shift === "night" ? "Night shift" : "Day shift";
 
   if (event === "requested") {
-    const details = `<table style="font-size:14px;border-collapse:collapse">${row("Name", esc(s.name))}${row("Company", esc(s.company))}${row("Arrival", fmt(s.arrive))}${row("Departure", fmt(s.depart))}${s.notes ? row("Notes", esc(s.notes)) : ""}</table>`;
+    const details = `<table style="font-size:14px;border-collapse:collapse">${row("Name", esc(s.name))}${row("Company", esc(s.company))}${row("Arrival", fmt(s.arrive))}${row("Departure", fmt(s.depart))}${row("Shift", shift)}${s.notes ? row("Notes", esc(s.notes)) : ""}</table>`;
     if (s.requester_email) out.push(await send([s.requester_email], `Bed request received: ${s.name}`, wrap("We got your request",
       `<p style="margin:0 0 10px">Your bed request is in the queue. The camp coordinator assigns rooms and you will get another email with the room and dates once it is done.</p>${details}`)));
     if (adminTo.length) out.push(await send(adminTo, `New bed request: ${s.name} (${s.company})`, wrap("New bed request",
@@ -79,7 +80,29 @@ Deno.serve(async (req) => {
     const title = event === "assigned" ? (datesChanged ? "Bed confirmed, with changed dates" : "Bed confirmed") : (moved ? "Your room has changed" : "Your stay dates have changed");
     const note = datesChanged ? `<p style="margin:10px 0 0;color:#8a5a00"><b>Note:</b> the dates differ from what was requested (${fmt(s.req_arrive)} to ${fmt(s.req_depart)}).</p>` : "";
     out.push(await send([s.requester_email], `${title}: ${s.name}`, wrap(title,
-      `<table style="font-size:14px;border-collapse:collapse">${row("Name", esc(s.name))}${row("Company", esc(s.company))}${row("Room", `<b>${esc(bed)}</b>`)}${row("Arrival", fmt(s.arrive))}${row("Departure", fmt(s.depart))}${row("Length of stay", `${Math.round((Date.parse(s.depart) - Date.parse(s.arrive)) / 86400000) + 1} days`)}</table>${note}`)));
+      `<table style="font-size:14px;border-collapse:collapse">${row("Name", esc(s.name))}${row("Company", esc(s.company))}${row("Room", `<b>${esc(bed)}</b>`)}${row("Arrival", fmt(s.arrive))}${row("Departure", fmt(s.depart))}${row("Shift", shift)}${row("Length of stay", `${Math.round((Date.parse(s.depart) - Date.parse(s.arrive)) / 86400000) + 1} days`)}</table>${note}`)));
+  }
+
+  if ((event === "change_requested" || event === "change_decided") && change_id) {
+    const { data: c } = await sb.from("change_requests").select("*").eq("id", change_id).single();
+    if (c) {
+      const bed = bedLabel(layout, s.bed);
+      const tbl = `<table style="font-size:14px;border-collapse:collapse">${row("Name", esc(s.name))}${row("Company", esc(s.company))}${row("Room", esc(bed))}${row("Current dates", `${fmt(s.arrive)} to ${fmt(s.depart)}`)}${row("Requested dates", `<b>${fmt(c.new_arrive)} to ${fmt(c.new_depart)}</b>`)}${c.note ? row("Reason", esc(c.note)) : ""}</table>`;
+      if (event === "change_requested" && adminTo.length) {
+        out.push(await send(adminTo, `Date change requested: ${s.name} (${s.company})`, wrap("Date change requested",
+          `${tbl}<p style="margin:12px 0 0">Asked by ${esc(c.requested_by)}. <a href="${SITE}/#people" style="color:#a8842f;font-weight:700">Open the board</a> to approve or decline.</p>`)));
+      }
+      if (event === "change_decided") {
+        const ok = c.status === "approved";
+        const title = ok ? "Date change approved" : "Date change not approved";
+        const body = ok
+          ? `<p style="margin:0 0 10px">The new dates for <b>${esc(s.name)}</b> are confirmed: <b>${fmt(s.arrive)} to ${fmt(s.depart)}</b>, ${esc(bed)}.</p>`
+          : `<p style="margin:0 0 10px">The camp coordinator could not approve the date change for <b>${esc(s.name)}</b>. The stay stays at ${fmt(s.arrive)} to ${fmt(s.depart)}.</p>`;
+        const dn = c.decision_note ? `<p style="margin:10px 0 0"><b>Note from the coordinator:</b> ${esc(c.decision_note)}</p>` : "";
+        const to = [c.requested_by]; if (ok && s.requester_email && s.requester_email !== c.requested_by) to.push(s.requester_email);
+        out.push(await send(to, `${title}: ${s.name}`, wrap(title, body + tbl + dn)));
+      }
+    }
   }
 
   if (event === "declined" && s.requester_email) {

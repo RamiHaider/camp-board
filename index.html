@@ -198,6 +198,14 @@ th{color:var(--muted);font-weight:500;font-size:12px}
 .roster .row .dt{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
 .roster .row .dt.soon{color:var(--warn)} .roster .row .dt.over{color:var(--bad)}
 .roster .empty{padding:12px}
+.shift{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);vertical-align:middle}
+.shift.night{background:#2b2d42;color:#dfe3ff;border-color:#2b2d42}
+.exports{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.exports select{padding:5px 8px;font-size:12.5px}
+.chg{background:var(--surface-2);border:1px dashed var(--line);border-radius:8px;padding:10px;margin:6px 0 2px;display:flex;flex-direction:column;gap:8px}
+.chg .quick{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--muted)}
+.pill.pending{background:#fff4d6;color:#8a5a00;border-color:#e8cf8a} .pill.approved{background:#e4f3dc;color:#2f6a12;border-color:#b7dca2} .pill.declined{background:#f9e0e0;color:#8a1f1f;border-color:#e8b4b4}
 </style>
 </head>
 <body>
@@ -208,6 +216,7 @@ th{color:var(--muted);font-weight:500;font-size:12px}
     <nav id="nav">
       <a href="#map" data-view="map" class="adminonly">Map</a>
       <a href="#people" data-view="people" class="adminonly">People<span class="badge" id="pendBadge" hidden>0</span></a>
+      <a href="#mine" data-view="mine" class="companyonly" hidden>My people<span class="badge" id="mineBadge" hidden>0</span></a>
       <a href="#request" data-view="request">Request a bed</a>
       <a href="#history" data-view="history" class="adminonly">History</a>
       <a href="#admin" data-view="admin" id="adminLink">Admin</a>
@@ -236,6 +245,7 @@ th{color:var(--muted);font-weight:500;font-size:12px}
           <button class="btn sm" id="btnAddPerson">+ Add person</button>
           <button class="btn sm" id="btnEditLayout">Edit layout</button>
           <span class="filter">Free between <input type="date" id="fFrom"> and <input type="date" id="fTo"> <button class="btn sm" id="fClear" hidden>Clear</button></span>
+          <span class="exports"><select id="weekPick" aria-label="Departure period"><option value="7">Next 7 days</option><option value="this">This week (Mon–Sun)</option><option value="next">Next week (Mon–Sun)</option></select><button class="btn sm" id="btnPrintWeek" title="Who leaves and arrives on which day, by room">Print departures</button><button class="btn sm" id="btnPrintPlan" title="Every room with name, dates and notes">Print floor plan</button><button class="btn sm" id="btnCsv" title="Everyone in camp or waiting, as a spreadsheet">CSV</button></span>
         </div>
         <div id="modebar" class="modebar" hidden></div>
         <div id="sections" class="sections"></div>
@@ -246,9 +256,14 @@ th{color:var(--muted);font-weight:500;font-size:12px}
         <div class="cols" id="peopleCols" style="margin-top:16px"></div>
       </section>
 
+      <section class="view" id="view-mine" hidden>
+        <div id="mineHost" class="cols" style="margin-top:16px"></div>
+      </section>
+
       <section class="view" id="view-request" hidden>
         <form class="form" id="reqForm">
           <h2>Request bed(s)</h2>
+          <p class="note" id="rLocked" hidden></p>
           <div class="field"><label for="rEmail">Your email</label><input type="email" id="rEmail" required autocomplete="email" maxlength="120" placeholder="you@company.com"></div>
           <div class="field"><label for="rCompany">Company</label><select id="rCompany" required><option value="">— choose —</option></select></div>
           <div class="field" id="rOtherWrap" hidden><label for="rCompanyOther">Company name</label><input id="rCompanyOther" maxlength="80" autocomplete="organization"></div>
@@ -266,7 +281,8 @@ th{color:var(--muted);font-weight:500;font-size:12px}
 
       <section class="view" id="view-admin" hidden>
         <form class="form" id="loginForm">
-          <h2>Admin sign in</h2>
+          <h2>Sign in</h2>
+          <p class="note">Camp admins, viewers and company portals all sign in here.</p>
           <div class="field"><label for="lEmail">Email</label><input type="email" id="lEmail" required autocomplete="username"></div>
           <div class="field"><label for="lPass">Password</label><input type="password" id="lPass" required autocomplete="current-password"></div>
           <div class="actions"><button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" id="lReset">Forgot password</button></div>
@@ -277,6 +293,11 @@ th{color:var(--muted);font-weight:500;font-size:12px}
           <p class="note" id="whoami"></p>
           <div class="actions"><button class="btn" id="btnLogout">Sign out</button></div>
           <div id="adminMsg" class="msg" hidden></div>
+        </div>
+        <div class="form" id="memberPanel" hidden>
+          <h2>Who has access</h2>
+          <div class="list" id="memberRows"></div>
+          <p class="note">Admins run the board. Viewers only look. A company login sees and manages its own people only. Logins are added or removed by the database administrator.</p>
         </div>
         <div class="form" id="companyPanel" hidden>
           <h2>Companies in the dropdown</h2>
@@ -309,7 +330,11 @@ const PALETTE = ["#2e7bd6","#d6632e","#8a3fc9","#c22f6a","#1f9ea3","#b58a00","#5
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const nextColor = () => PALETTE.find(c => !companies.some(x => x.color.toLowerCase()===c)) || PALETTE[companies.length % PALETTE.length];
-let session = null, role = null, isAdmin = false, canView = false;
+let session = null, role = null, isAdmin = false, canView = false, isCompany = false, canBoard = false, myCompany = null;
+let changes = [], members = [], mineEdit = null, editStayId = null;
+const shiftSel = (id, val, cls) => `<select ${id?`id="${id}"`:""} class="${cls||""}" aria-label="Shift"><option value="day"${val!=="night"?" selected":""}>Day shift</option><option value="night"${val==="night"?" selected":""}>Night shift</option></select>`;
+const shiftChip = s => s?.shift==="night" ? `<span class="shift night">Night</span>` : `<span class="shift">Day</span>`;
+const shiftText = s => s?.shift==="night" ? "Night shift" : "Day shift";
 let layout = null, stays = [], companies = [], settings = null;
 let mode = null, selectedBed = null, drawerKind = null;
 let editing = false, editLayout = null, addDefaults = null;
@@ -357,16 +382,20 @@ const allBeds = () => { const out=[]; (layout?.sections||[]).forEach(s=>s.rooms.
 /* ---- data ---- */
 async function loadAll(){
   if (!canView){ const {data} = await sb.from("companies").select("name,color").order("name"); companies = data||[]; renderCompanyList(); return; }
-  const [L, S, C, T] = await Promise.all([
+  const [L, S, C, T, R, M] = await Promise.all([
     sb.from("layout").select("*").eq("id","main").maybeSingle(),
     sb.from("stays").select("*"),
     sb.from("companies").select("*").order("name"),
-    sb.from("settings").select("*").eq("id","main").maybeSingle(),
+    isAdmin ? sb.from("settings").select("*").eq("id","main").maybeSingle() : Promise.resolve({data:null}),
+    sb.from("change_requests").select("*").order("created_at",{ascending:false}).limit(300),
+    isAdmin ? sb.from("members").select("email,role,company").order("role") : Promise.resolve({data:[]}),
   ]);
-  const err = L.error||S.error||C.error||T.error;
+  const err = L.error||S.error||C.error||T.error||R.error||M.error;
   if (err){ setStatus("Could not load camp data: "+err.message, "err"); return; }
   layout = L.data && L.data.sections?.length ? L.data : null;
   stays = (S.data||[]).map(s => ({...s, arrive:String(s.arrive).slice(0,10), depart:String(s.depart).slice(0,10)}));
+  changes = (R.data||[]).map(c => ({...c, new_arrive:String(c.new_arrive).slice(0,10), new_depart:String(c.new_depart).slice(0,10)}));
+  members = M.data||[];
   companies = C.data||[]; settings = T.data||null;
   loaded = true; setStatus(""); render();
 }
@@ -380,7 +409,7 @@ function subscribe(){
     .on("postgres_changes",{event:"*",schema:"public",table:"stays"}, refetch)
     .on("postgres_changes",{event:"*",schema:"public",table:"companies"}, refetch)
     .on("postgres_changes",{event:"*",schema:"public",table:"layout"}, refetch)
-    .on("postgres_changes",{event:"*",schema:"public",table:"settings"}, refetch)
+    .on("postgres_changes",{event:"*",schema:"public",table:"change_requests"}, refetch)
     .subscribe();
   pollTimer = setInterval(loadAll, 60000); // safety net if realtime drops
 }
@@ -394,15 +423,18 @@ const db = {
 };
 
 /* ---- views ---- */
-const VIEWS = ["map","people","request","history","admin"];
+const VIEWS = ["map","people","mine","request","history","admin"];
 function route(){
   const h = location.hash.replace("#","");
-  let v = VIEWS.includes(h) ? h : (canView ? "map" : "request");
-  if (!canView && !["request","admin"].includes(v)) v = "request";
+  const home = canBoard ? "map" : isCompany ? "mine" : "request";
+  let v = VIEWS.includes(h) ? h : home;
+  if (["map","people","history"].includes(v) && !canBoard) v = home;
+  if (v==="mine" && !isCompany) v = home;
   VIEWS.forEach(x => { $("#view-"+x).hidden = x!==v; });
   document.querySelectorAll("#nav a").forEach(a => a.dataset.view===v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
-  document.querySelectorAll(".adminonly").forEach(a => a.hidden = !canView);
-  $("#adminLink").textContent = canView ? (isAdmin ? "Admin" : "Viewer") : "Sign in";
+  document.querySelectorAll(".adminonly").forEach(a => a.hidden = !canBoard);
+  document.querySelectorAll(".companyonly").forEach(a => a.hidden = !isCompany);
+  $("#adminLink").textContent = canView ? (isAdmin ? "Admin" : isCompany ? "Account" : "Viewer") : "Sign in";
   $("#btnAddPerson").hidden = $("#btnEditLayout").hidden = !isAdmin;
   $("#setup").hidden = !(isAdmin && loaded && !layout && v==="map");
   if (v!=="map") closeDrawer();
@@ -418,9 +450,10 @@ function render(){
   route();
   renderCompanyList(); renderAdminPanel();
   if (!canView || !loaded) return;
+  if (isCompany){ renderMine(); return; }
   if (!layout){ renderPeople(); if(!isAdmin) setStatus("The camp layout has not been created yet."); return; }
   renderStats(); renderMap(); renderPeople(); renderHistory(); renderDrawer();
-  const pend = stays.filter(s=>s.status==="requested").length;
+  const pend = stays.filter(s=>s.status==="requested").length + (isAdmin ? changes.filter(c=>c.status==="pending").length : 0);
   $("#pendBadge").hidden = !pend; $("#pendBadge").textContent = pend;
 }
 
@@ -564,7 +597,7 @@ function rosterRows(){
   const ok=s=>!q || s.name.toLowerCase().includes(q) || s.company.toLowerCase().includes(q) || s.room.toLowerCase()===q || (s.notes||"").toLowerCase().includes(q);
   const shown=list.filter(ok);
   const groups={}; shown.forEach(s=>(groups[s.company]=groups[s.company]||[]).push(s));
-  const html=Object.entries(groups).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).map(([co,rows])=>`<div class="grp">${esc(co)} · ${rows.length}</div>`+rows.sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})).map(s=>`<div class="row${s.bed===selectedBed?" sel":""}" data-bed="${s.bed}" style="--c:${esc(companyColor(s.company))}"><span class="r">${esc(s.room)}</span><span class="nm">${esc(s.name)}${s.notes?`<small>${esc(s.notes)}</small>`:""}</span><span class="dt ${s.st==="leaving"?"soon":s.st==="overdue"?"over":""}">${fmt(s.arrive)} → ${fmt(s.depart)}</span></div>`).join("")).join("");
+  const html=Object.entries(groups).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).map(([co,rows])=>`<div class="grp">${esc(co)} · ${rows.length}</div>`+rows.sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})).map(s=>`<div class="row${s.bed===selectedBed?" sel":""}" data-bed="${s.bed}" style="--c:${esc(companyColor(s.company))}"><span class="r">${esc(s.room)}</span><span class="nm">${esc(s.name)}${s.shift==="night"?` <span class="shift night">Night</span>`:""}${s.notes?`<small>${esc(s.notes)}</small>`:""}</span><span class="dt ${s.st==="leaving"?"soon":s.st==="overdue"?"over":""}">${fmt(s.arrive)} → ${fmt(s.depart)}</span></div>`).join("")).join("");
   return {html: html || `<div class="empty">Nobody matches "${esc(listQuery)}".</div>`, n: shown.length, total: list.length};
 }
 function rosterHtml(){ const r=rosterRows(); return `<div class="roster"><div class="rhead"><h2>People in camp</h2><input id="rosterQ" type="search" placeholder="Search name, company or room" value="${esc(listQuery)}" autocomplete="off"><span class="cnt num">${r.n===r.total?r.total:r.n+" of "+r.total}</span></div><div class="rows">${r.html}</div></div>`; }
@@ -579,7 +612,7 @@ const tipEl=$("#tip");
 document.addEventListener("mouseover", e=>{
   const b=e.target.closest(".plan .bed"); if(!b){ tipEl.hidden=true; return; }
   const {now,next}=bedInfo(b.dataset.bed); const lbl=esc(bedLabel(b.dataset.bed));
-  tipEl.innerHTML = now ? `<b>${esc(now.name)}</b><br>${esc(now.company)} · ${lbl}<br><span class="m">${fmt(now.arrive)} → ${fmt(now.depart)} · ${daysUntil(now.depart)>=0?daysUntil(now.depart)+" days left":Math.abs(daysUntil(now.depart))+" days overdue"}</span>${now.notes?`<br><span class="m">${esc(now.notes)}</span>`:""}`
+  tipEl.innerHTML = now ? `<b>${esc(now.name)}</b> · ${shiftText(now)}<br>${esc(now.company)} · ${lbl}<br><span class="m">${fmt(now.arrive)} → ${fmt(now.depart)} · ${daysUntil(now.depart)>=0?daysUntil(now.depart)+" days left":Math.abs(daysUntil(now.depart))+" days overdue"}</span>${now.notes?`<br><span class="m">${esc(now.notes)}</span>`:""}`
     : next ? `<b>Reserved</b><br>${esc(next.name)} from ${fmt(next.arrive)}<br><span class="m">${lbl}</span>`
     : `<b>${lbl}</b><br><span class="m">Open. Click to put someone here.</span>`;
   tipEl.hidden=false;
@@ -591,13 +624,19 @@ function renderCompanyList(){
   const sel=$("#rCompany"); const cur=sel.value;
   sel.innerHTML = `<option value="">— choose —</option>` + companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("") + `<option value="__other">Other (not in the list)</option>`;
   if ([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  if (isCompany && myCompany){
+    if (![...sel.options].some(o=>o.value===myCompany)) sel.insertAdjacentHTML("afterbegin",`<option value="${esc(myCompany)}">${esc(myCompany)}</option>`);
+    sel.value=myCompany; sel.disabled=true;
+    $("#rLocked").hidden=false; $("#rLocked").textContent=`Requesting for ${myCompany}. The confirmation goes to the email below.`;
+    if (!$("#rEmail").value) $("#rEmail").value = rememberedEmail();
+  } else { sel.disabled=false; $("#rLocked").hidden=true; }
   $("#rOtherWrap").hidden = sel.value!=="__other";
 }
 $("#rCompany").onchange=()=>{ $("#rOtherWrap").hidden = $("#rCompany").value!=="__other"; if($("#rCompany").value==="__other") $("#rCompanyOther").focus(); };
 
 function itemRow(s, extra){
   const col = companyColor(s.company);
-  return `<div class="item" style="border-left-color:${esc(col)}"><div class="who"><b>${esc(s.name)}</b><small>${esc(s.company)}${s.bed?" · "+esc(bedLabel(s.bed)):""}${s.requester_email?" · "+esc(s.requester_email):""}${s.notes?" · "+esc(s.notes):""}</small></div><span class="when">${fmt(s.arrive)} → ${fmt(s.depart)}</span>${extra||""}</div>`;
+  return `<div class="item" style="border-left-color:${esc(col)}"><div class="who"><b>${esc(s.name)}</b> ${shiftChip(s)}<small>${esc(s.company)}${s.bed?" · "+esc(bedLabel(s.bed)):""}${s.requester_email?" · "+esc(s.requester_email):""}${s.notes?" · "+esc(s.notes):""}</small></div><span class="when">${fmt(s.arrive)} → ${fmt(s.depart)}</span>${extra||""}</div>`;
 }
 function renderPeople(){
   const t=today(), week=addDays(t,7);
@@ -607,14 +646,20 @@ function renderPeople(){
   const leaving = assigned.filter(s=>s.depart<=week).sort((a,b)=>a.depart<b.depart?-1:1);
   const inCamp = assigned.filter(s=>s.arrive<=t).sort((a,b)=>a.depart<b.depart?-1:1);
   const card = (title, list, fn, emptyText) => `<div class="card"><h3>${title} <span class="num">(${list.length})</span></h3><div class="list">${list.length?list.map(fn).join(""):`<div class="empty">${emptyText}</div>`}</div></div>`;
+  const pendingChanges = changes.filter(c=>c.status==="pending").map(c=>({c, s:stays.find(x=>x.id===c.stay_id)})).filter(x=>x.s);
+  const chgRow = ({c,s}) => `<div class="item" style="border-left-color:${esc(companyColor(s.company))}"><div class="who"><b>${esc(s.name)}</b> ${shiftChip(s)}<small>${esc(s.company)}${s.bed?" · "+esc(bedLabel(s.bed)):" · not assigned yet"} · now ${fmt(s.arrive)} → ${fmt(s.depart)}<br><b>Wants ${fmt(c.new_arrive)} → ${fmt(c.new_depart)}</b> · asked by ${esc(c.requested_by)} ${fmt(c.created_at)}${c.note?" · "+esc(c.note):""}</small></div>${isAdmin?`<button class="btn sm primary" data-approve="${c.id}">Approve</button><button class="btn sm" data-declinechg="${c.id}">Decline</button>`:""}</div>`;
   $("#peopleCols").innerHTML =
-    card("Requests waiting", pending, s=>itemRow(s, isAdmin?`<button class="btn sm primary" data-assign="${s.id}">Assign</button><button class="btn sm" data-decline="${s.id}" title="Decline">×</button>`:""), "No open requests.") +
+    (pendingChanges.length || isAdmin ? card("Date changes requested", pendingChanges, chgRow, "No date changes waiting.") : "") +
+    card("Requests waiting", pending, s=>itemRow(s, isAdmin?`<button class="btn sm primary" data-assign="${s.id}">Assign</button><button class="btn sm" data-edit="${s.id}" title="Edit name, dates, shift or notes">Edit</button><button class="btn sm" data-decline="${s.id}" title="Decline">×</button>`:""), "No open requests.") +
     card("Leaving in the next 7 days", leaving, s=>itemRow(s, isAdmin?`<button class="btn sm" data-checkout="${s.id}">Check out</button>`:""), "Nobody leaving this week.") +
     card("Arriving in the next 2 days", arriving, s=>itemRow(s), "Nobody arriving.") +
     card("Everyone in camp", inCamp, s=>itemRow(s, `<button class="btn sm" data-open="${s.id}">Open</button>`), "Camp is empty.");
   const host=$("#peopleCols");
   host.querySelectorAll("[data-assign]").forEach(b=>b.onclick=()=>{ if(!layout) return toast("Create the layout first (Map tab)."); mode={type:"assign",stayId:b.dataset.assign}; selectedBed=null; closeDrawer(); location.hash="#map"; render(); });
   host.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>declineRequest(b.dataset.decline));
+  host.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{ editStayId=b.dataset.edit; selectedBed=null; drawerKind="edit"; location.hash="#map"; render(); });
+  host.querySelectorAll("[data-approve]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ const {error}=await sb.rpc("decide_change",{p_id:b.dataset.approve,p_approve:true,p_note:""}); if(error) throw error; toast("Dates changed and the company was told"); await loadAll(); }catch(e){ toast(e.message); b.disabled=false; } });
+  host.querySelectorAll("[data-declinechg]").forEach(b=>b.onclick=async()=>{ if(!b.dataset.sure){ b.dataset.sure="1"; b.textContent="Confirm decline"; return; } b.disabled=true; try{ const {error}=await sb.rpc("decide_change",{p_id:b.dataset.declinechg,p_approve:false,p_note:""}); if(error) throw error; toast("Declined, the company was told"); await loadAll(); }catch(e){ toast(e.message); b.disabled=false; } });
   host.querySelectorAll("[data-checkout]").forEach(b=>b.onclick=()=>checkOut(b.dataset.checkout));
   host.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{ const s=stays.find(x=>x.id===b.dataset.open); if(s?.bed){ selectedBed=s.bed; drawerKind="bed"; location.hash="#map"; render(); } });
 }
@@ -633,8 +678,13 @@ function renderAdminPanel(){
   renderCompanyPanel();
   $("#loginForm").hidden = canView;
   $("#adminPanel").hidden = !canView;
+  $("#memberPanel").hidden = !isAdmin;
   if (canView){
-    $("#whoami").textContent = `Signed in as ${session?.user?.email||""} (${isAdmin?"admin, can change the board":"viewer, read only"}).`;
+    $("#whoami").textContent = `Signed in as ${session?.user?.email||""} (${isAdmin?"admin, can change the board":isCompany?`company portal for ${myCompany||"?"}, sees its own people only`:"viewer, read only"}).`;
+  }
+  if (isAdmin){
+    const lbl = {admin:"Admin", viewer:"Viewer", company:"Company portal"};
+    $("#memberRows").innerHTML = members.length ? members.map(m=>`<div class="item" style="border-left-color:${m.role==="company"?esc(companyColor(m.company)):"var(--gold)"}"><div class="who"><b>${esc(m.email)}</b><small>${lbl[m.role]||esc(m.role)}${m.company?" · "+esc(m.company):""}</small></div></div>`).join("") : `<div class="empty">No logins.</div>`;
   }
 }
 
@@ -674,6 +724,7 @@ function renderDrawer(){
       <div class="field"><label for="pName">Full name</label><input id="pName" autocomplete="off"></div>
       ${companyPicker("", "")}
       <div class="grid2"><div class="field"><label for="pArrive">Arrival</label><input type="date" id="pArrive" value="${t}"></div><div class="field"><label for="pDepart">Departure</label><input type="date" id="pDepart" value="${addDays(t,14)}"></div></div>
+      <div class="field"><label for="pShift">Shift</label>${shiftSel("pShift", addDefaults?.shift||"day")}</div>
       <div class="field"><label for="pNotes">Notes</label><textarea id="pNotes"></textarea></div>
       <div class="actions"><button class="btn primary" id="pSave">${selectedBed?"Assign to this bed":"Add and pick a bed"}</button>${selectedBed?"":`<button class="btn" id="pMore" title="Saves this person to Requests waiting and keeps company and dates for the next one">Save and add another</button>`}</div><div id="dMsg" class="msg err" hidden></div>`;
     wireCompanyPicker(d);
@@ -685,9 +736,9 @@ function renderDrawer(){
         const arrive=d.querySelector("#pArrive").value, depart=d.querySelector("#pDepart").value;
         if(!arrive||!depart||depart<arrive) throw new Error("Check the dates. Departure must be on or after arrival.");
         const company=await resolveCompany(d);
-        const notes=d.querySelector("#pNotes").value.trim();
-        await db.insertStay({name,company,arrive,depart,notes,bed:null,status:"requested"});
-        addDefaults={company,arrive,depart}; toast(`${name} added to Requests waiting`); render(); d.querySelector("#pName").focus();
+        const notes=d.querySelector("#pNotes").value.trim(), shift=d.querySelector("#pShift").value;
+        await db.insertStay({name,company,arrive,depart,notes,shift,bed:null,status:"requested"});
+        addDefaults={company,arrive,depart,shift}; toast(`${name} added to Requests waiting`); render(); d.querySelector("#pName").focus();
       }catch(e){ const m=d.querySelector("#dMsg"); m.hidden=false; m.textContent=e.message||"Could not save. Try again."; }
     };
     d.querySelector("#pSave").onclick=async()=>{
@@ -696,17 +747,43 @@ function renderDrawer(){
         const arrive=d.querySelector("#pArrive").value, depart=d.querySelector("#pDepart").value;
         if(!arrive||!depart||depart<arrive) throw new Error("Check the dates. Departure must be on or after arrival.");
         const company=await resolveCompany(d);
-        const notes=d.querySelector("#pNotes").value.trim();
+        const notes=d.querySelector("#pNotes").value.trim(), shift=d.querySelector("#pShift").value;
         if (selectedBed){
           if(!freeBetween(selectedBed,arrive,depart)) throw new Error("That bed is taken for part of those dates.");
-          await db.insertStay({name,company,arrive,depart,notes,bed:selectedBed,status:"assigned",assigned_at:new Date().toISOString()});
+          await db.insertStay({name,company,arrive,depart,notes,shift,bed:selectedBed,status:"assigned",assigned_at:new Date().toISOString()});
           toast(`${name} assigned to ${bedLabel(selectedBed)}`); drawerKind="bed";
         } else {
-          const row=await db.insertStay({name,company,arrive,depart,notes,bed:null,status:"requested"});
+          const row=await db.insertStay({name,company,arrive,depart,notes,shift,bed:null,status:"requested"});
           mode={type:"assign",stayId:row.id}; closeDrawer();
         }
         render();
       }catch(e){ const m=d.querySelector("#dMsg"); m.hidden=false; m.textContent=e.message||"Could not save. Try again."; }
+    };
+    return;
+  }
+  if (drawerKind==="edit"){
+    const s=stays.find(x=>x.id===editStayId); if(!s){ closeDrawer(); return; }
+    d.innerHTML = `<div class="hd"><h2>Edit request</h2><button class="btn sm" id="dClose">Close</button></div>
+      <div class="field"><label for="pName">Full name</label><input id="pName" value="${esc(s.name)}"></div>
+      ${companyPicker(s.company, "")}
+      <div class="grid2"><div class="field"><label for="pArrive">Arrival</label><input type="date" id="pArrive" value="${s.arrive}"></div><div class="field"><label for="pDepart">Departure</label><input type="date" id="pDepart" value="${s.depart}"></div></div>
+      <div class="field"><label for="pShift">Shift</label>${shiftSel("pShift", s.shift)}</div>
+      <div class="field"><label for="pNotes">Notes</label><textarea id="pNotes">${esc(s.notes||"")}</textarea></div>
+      ${s.requester_email?`<p class="note">Requested by ${esc(s.requester_email)}.</p>`:""}
+      <div class="actions"><button class="btn primary" id="pSave">Save</button><button class="btn" id="pAssign">Assign to a bed</button></div><div id="dMsg" class="msg err" hidden></div>`;
+    wireCompanyPicker(d);
+    if (![...d.querySelector("#pCompany").options].some(o=>o.value===s.company)){ const sel=d.querySelector("#pCompany"); sel.insertAdjacentHTML("afterbegin",`<option value="${esc(s.company)}" selected>${esc(s.company)}</option>`); }
+    d.querySelector("#dClose").onclick=closeDrawer;
+    d.querySelector("#pAssign").onclick=()=>{ mode={type:"assign",stayId:s.id}; closeDrawer(); render(); };
+    d.querySelector("#pSave").onclick=async()=>{
+      try{
+        const name=d.querySelector("#pName").value.trim(); if(!name) throw new Error("Name is required.");
+        const arrive=d.querySelector("#pArrive").value, depart=d.querySelector("#pDepart").value;
+        if(!arrive||!depart||depart<arrive) throw new Error("Check the dates. Departure must be on or after arrival.");
+        const company=await resolveCompany(d);
+        await db.updateStay(s.id,{name,company,arrive,depart,shift:d.querySelector("#pShift").value,notes:d.querySelector("#pNotes").value.trim()});
+        toast("Saved"); closeDrawer(); location.hash="#people";
+      }catch(e){ const m=d.querySelector("#dMsg"); m.hidden=false; m.textContent=e.message; }
     };
     return;
   }
@@ -724,24 +801,25 @@ function renderDrawer(){
   const st=stayState(person);
   const label = {in:"In camp",leaving:"Leaving soon",overdue:"Past departure date",reserved:"Reserved, not yet arrived"}[st];
   d.innerHTML = `<div class="hd"><h2>${esc(person.name)}</h2><button class="btn sm" id="dClose">Close</button></div>
-    <div><span class="chip"><i style="background:${esc(companyColor(person.company))}"></i>${esc(person.company)}</span> <span class="chip">${label}</span></div>
+    <div><span class="chip"><i style="background:${esc(companyColor(person.company))}"></i>${esc(person.company)}</span> <span class="chip">${label}</span> ${shiftChip(person)}</div>
     <dl class="kv"><dt>Bed</dt><dd>${esc(bedLabel(key))}</dd><dt>Arrived</dt><dd>${fmt(person.arrive)}</dd><dt>Leaves</dt><dd>${fmt(person.depart)} <span class="note num">(${daysUntil(person.depart)>=0?daysUntil(person.depart)+" days left":Math.abs(daysUntil(person.depart))+" days overdue"})</span></dd>${person.notes?`<dt>Notes</dt><dd>${esc(person.notes)}</dd>`:""}</dl>
     ${next && now ? `<p class="note">Next in this bed: ${esc(next.name)} from ${fmt(next.arrive)}.</p>`:""}
     ${isAdmin?`<h3>Change</h3>
     <div class="grid2"><div class="field"><label for="eArrive">Arrival</label><input type="date" id="eArrive" value="${person.arrive}"></div><div class="field"><label for="eDepart">Departure</label><input type="date" id="eDepart" value="${person.depart}"></div></div>
-    <div class="field"><label for="eNotes">Notes</label><input id="eNotes" value="${esc(person.notes||"")}"></div>
-    <div class="actions"><button class="btn" id="eSave">Save dates</button><button class="btn" id="eMove">Move to another bed</button></div>
-    <div class="actions"><button class="btn primary" id="eOut">Check out now</button><button class="btn danger" id="eCancel">Remove without record</button></div>
+    <div class="field"><label for="eShift">Shift</label>${shiftSel("eShift", person.shift)}</div>
+    <div class="field"><label for="eNotes">Notes</label><textarea id="eNotes">${esc(person.notes||"")}</textarea></div>
+    <div class="actions"><button class="btn primary" id="eSave">Save changes</button><button class="btn" id="eMove">Move to another bed</button></div>
+    <div class="actions"><button class="btn" id="eOut">Check out now</button><button class="btn danger" id="eCancel">Remove without record</button></div>
     <div id="dMsg" class="msg err" hidden></div>`:""}`;
   d.querySelector("#dClose").onclick=closeDrawer;
   if (!isAdmin) return;
   d.querySelector("#eSave").onclick=async()=>{
-    const arrive=d.querySelector("#eArrive").value, depart=d.querySelector("#eDepart").value, notes=d.querySelector("#eNotes").value.trim();
+    const arrive=d.querySelector("#eArrive").value, depart=d.querySelector("#eDepart").value, notes=d.querySelector("#eNotes").value.trim(), shift=d.querySelector("#eShift").value;
     const m=d.querySelector("#dMsg");
     if(!arrive||!depart||depart<arrive){ m.hidden=false; m.textContent="Departure must be on or after arrival."; return; }
     const clash = stays.some(s=>s.id!==person.id && s.status==="assigned" && s.bed===key && s.arrive<=depart && s.depart>=arrive);
     if (clash){ m.hidden=false; m.textContent="Those dates overlap someone else booked in this bed."; return; }
-    try{ await db.updateStay(person.id,{arrive,depart,notes}); toast("Saved"); }catch(e){ m.hidden=false; m.textContent=e.message; }
+    try{ await db.updateStay(person.id,{arrive,depart,notes,shift}); toast("Saved"); }catch(e){ m.hidden=false; m.textContent=e.message; }
   };
   d.querySelector("#eMove").onclick=()=>{ mode={type:"move",stayId:person.id}; closeDrawer(); render(); };
   d.querySelector("#eOut").onclick=()=>checkOut(person.id);
@@ -797,18 +875,22 @@ function personBlock(i, d){
     <div class="ph"><span>Person ${i+1}</span>${i>0?`<button type="button" class="btn sm" data-rm="${i}">Remove</button>`:""}</div>
     <div class="field"><label>Full name</label><input class="pName" required autocomplete="off" maxlength="120" value="${esc(d.name||"")}"></div>
     <div class="grid2"><div class="field"><label>Arrival</label><input type="date" class="pArrive" required value="${d.arrive}"></div><div class="field"><label>Departure</label><input type="date" class="pDepart" required value="${d.depart}"></div></div>
+    <div class="field"><label>Shift</label>${shiftSel("", d.shift||"day", "pShift")}</div>
     <div class="field"><label>Notes (role, preferences, anything useful)</label><input class="pNotes" maxlength="500" value="${esc(d.notes||"")}"></div>
   </div>`;
 }
 function readPeople(){
-  return [...document.querySelectorAll("#rPeople .person")].map(el=>({name:el.querySelector(".pName").value.trim(), arrive:el.querySelector(".pArrive").value, depart:el.querySelector(".pDepart").value, notes:el.querySelector(".pNotes").value.trim()}));
+  return [...document.querySelectorAll("#rPeople .person")].map(el=>({name:el.querySelector(".pName").value.trim(), arrive:el.querySelector(".pArrive").value, depart:el.querySelector(".pDepart").value, shift:el.querySelector(".pShift").value, notes:el.querySelector(".pNotes").value.trim()}));
 }
 function renderPeopleForm(list){
   const host=$("#rPeople"); host.innerHTML = list.map((d,i)=>personBlock(i,d)).join("");
   host.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ const l=readPeople(); l.splice(Number(b.dataset.rm),1); renderPeopleForm(l); });
 }
-function resetPeopleForm(){ renderPeopleForm([{name:"",arrive:today(),depart:addDays(today(),14),notes:""}]); }
-$("#rAdd").onclick=()=>{ const l=readPeople(); const last=l[l.length-1]||{arrive:today(),depart:addDays(today(),14)}; l.push({name:"",arrive:last.arrive,depart:last.depart,notes:""}); renderPeopleForm(l); const inputs=document.querySelectorAll("#rPeople .pName"); inputs[inputs.length-1].focus(); };
+function resetPeopleForm(){ renderPeopleForm([{name:"",arrive:today(),depart:addDays(today(),14),shift:"day",notes:""}]); }
+$("#rAdd").onclick=()=>{ const l=readPeople(); const last=l[l.length-1]||{arrive:today(),depart:addDays(today(),14),shift:"day"}; l.push({name:"",arrive:last.arrive,depart:last.depart,shift:last.shift,notes:""}); renderPeopleForm(l); const inputs=document.querySelectorAll("#rPeople .pName"); inputs[inputs.length-1].focus(); };
+const CONTACT_KEY="campContactEmail";
+const rememberedEmail = () => { try{ return localStorage.getItem(CONTACT_KEY)||""; }catch(e){ return ""; } };
+const rememberEmail = v => { try{ localStorage.setItem(CONTACT_KEY, v); }catch(e){} };
 $("#reqForm").onsubmit=async e=>{
   e.preventDefault();
   const btn=$("#rSend"); btn.disabled=true;
@@ -822,18 +904,133 @@ $("#reqForm").onsubmit=async e=>{
     }
     const sent=[];
     for (const p of people){
-      const {error} = await sb.rpc("submit_request",{p_email:email,p_name:p.name,p_company:company,p_arrive:p.arrive,p_depart:p.depart,p_notes:p.notes});
+      const {error} = await sb.rpc("submit_request",{p_email:email,p_name:p.name,p_company:company,p_arrive:p.arrive,p_depart:p.depart,p_notes:p.notes,p_shift:p.shift||"day"});
       if (error) throw new Error(`${p.name}: ${error.message}${sent.length?` (already sent: ${sent.join(", ")})`:""}`);
       sent.push(p);
     }
-    const r=$("#reqReceipt"); r.hidden=false; r.innerHTML = `<h2>Request received</h2><p class="note">Sent ${new Date().toLocaleString()} for <b>${esc(company)}</b>. Confirmation and room details will go to <b>${esc(email)}</b> once the camp admin assigns beds.</p><div class="tablewrap"><table><thead><tr><th>Name</th><th>Arrival</th><th>Departure</th><th>Notes</th></tr></thead><tbody>${sent.map(p=>`<tr><td>${esc(p.name)}</td><td>${fmt(p.arrive)}</td><td>${fmt(p.depart)}</td><td>${esc(p.notes||"")}</td></tr>`).join("")}</tbody></table></div><div class="actions"><button type="button" class="btn" id="reqAgain">Send another request</button></div>`;
+    const r=$("#reqReceipt"); r.hidden=false; r.innerHTML = `<h2>Request received</h2><p class="note">Sent ${new Date().toLocaleString()} for <b>${esc(company)}</b>. Confirmation and room details will go to <b>${esc(email)}</b> once the camp admin assigns beds.</p><div class="tablewrap"><table><thead><tr><th>Name</th><th>Arrival</th><th>Departure</th><th>Shift</th><th>Notes</th></tr></thead><tbody>${sent.map(p=>`<tr><td>${esc(p.name)}</td><td>${fmt(p.arrive)}</td><td>${fmt(p.depart)}</td><td>${shiftText(p)}</td><td>${esc(p.notes||"")}</td></tr>`).join("")}</tbody></table></div><div class="actions"><button type="button" class="btn" id="reqAgain">Send another request</button></div>`;
     r.querySelector("#reqAgain").onclick=()=>{ r.hidden=true; $("#reqForm").hidden=false; };
     $("#reqForm").hidden=true; showMsg("#reqMsg","");
+    rememberEmail(email);
     resetPeopleForm();
     loadAll();
   }catch(err){ showMsg("#reqMsg", err.message||"Could not send. Try again.", "err"); }
   finally{ btn.disabled=false; }
 };
+
+/* ---- company portal ("My people") ---- */
+function renderMine(){
+  const host=$("#mineHost"); const t=today();
+  const byDepart=(a,b)=>a.depart<b.depart?-1:1;
+  const assigned=stays.filter(s=>s.status==="assigned");
+  const inCamp=assigned.filter(s=>s.arrive<=t).sort(byDepart);
+  const upcoming=assigned.filter(s=>s.arrive>t).sort((a,b)=>a.arrive<b.arrive?-1:1);
+  const pending=stays.filter(s=>s.status==="requested").sort((a,b)=>a.arrive<b.arrive?-1:1);
+  const closed=stays.filter(s=>s.status==="checked_out"||s.status==="declined").sort((a,b)=>(b.closed_at||"")<(a.closed_at||"")?-1:1).slice(0,40);
+  const pendingFor = id => changes.find(c=>c.stay_id===id && c.status==="pending");
+  const row = s => {
+    const pc=pendingFor(s.id);
+    const room = s.bed ? roomNameOf(s.bed) : null;
+    const open = mineEdit===s.id;
+    const form = open ? `<div class="chg">
+        <div class="grid2"><div class="field"><label>New arrival</label><input type="date" class="cArrive" value="${s.arrive}"></div><div class="field"><label>New departure</label><input type="date" class="cDepart" value="${s.depart}"></div></div>
+        <div class="quick"><span class="note">Quick extend:</span><button type="button" class="btn sm" data-plus="1">+1 day</button><button type="button" class="btn sm" data-plus="2">+2 days</button><button type="button" class="btn sm" data-plus="7">+1 week</button></div>
+        <div class="field"><label>Your email (for the answer)</label><input type="email" class="cEmail" value="${esc(rememberedEmail()||s.requester_email||"")}" placeholder="you@company.com"></div>
+        <div class="field"><label>Reason or note (optional)</label><input class="cNote" maxlength="500"></div>
+        <div class="actions"><button type="button" class="btn primary" data-send="${s.id}">Send change request</button><button type="button" class="btn" data-cancelchg="1">Cancel</button></div>
+        <div class="msg err cMsg" hidden></div></div>` : "";
+    return `<div class="item" style="border-left-color:${esc(companyColor(s.company))}"><div class="who"><b>${esc(s.name)}</b> ${shiftChip(s)}${pc?` <span class="pill pending">change pending: ${fmt(pc.new_arrive)} → ${fmt(pc.new_depart)}</span>`:""}<small>${room?`Room ${esc(room)}`:"Room not assigned yet"}${s.notes?" · "+esc(s.notes):""}</small>${form}</div><span class="when">${fmt(s.arrive)} → ${fmt(s.depart)}</span>${open?"":`<button class="btn sm" data-chg="${s.id}">Change dates</button>`}</div>`;
+  };
+  const card = (title, list, fn, emptyText) => `<div class="card"><h3>${title} <span class="num">(${list.length})</span></h3><div class="list">${list.length?list.map(fn).join(""):`<div class="empty">${emptyText}</div>`}</div></div>`;
+  const chgHist = changes.slice(0,30).map(c=>{ const s=stays.find(x=>x.id===c.stay_id); if(!s) return ""; return `<div class="item" style="border-left-color:${esc(companyColor(s.company))}"><div class="who"><b>${esc(s.name)}</b> <span class="pill ${c.status}">${c.status}</span><small>${fmt(c.new_arrive)} → ${fmt(c.new_depart)} · asked ${fmt(c.created_at)}${c.decided_at?" · answered "+fmt(c.decided_at):""}${c.decision_note?" · "+esc(c.decision_note):""}</small></div></div>`; }).join("");
+  host.innerHTML = `<div class="card" style="grid-column:1/-1"><h3>${esc(myCompany||"My company")}</h3><p class="note">You see only your company's people. <b>Change dates</b> on a person sends an extension or date-change request to the camp coordinator, who approves or declines it, and you get an email either way. To add people, use <a href="#request">Request a bed</a>.</p><div class="actions"><a class="btn primary" href="#request">Request beds for ${esc(myCompany||"my company")}</a></div></div>` +
+    card("In camp now", inCamp, row, "Nobody from your company is in camp.") +
+    card("Arriving later", upcoming, row, "No upcoming arrivals.") +
+    card("Requests waiting for a room", pending, row, "No open requests.") +
+    `<div class="card"><h3>Date change requests <span class="num">(${changes.length})</span></h3><div class="list">${chgHist||`<div class="empty">None yet.</div>`}</div></div>` +
+    card("Past stays", closed, s=>`<div class="item" style="border-left-color:${esc(companyColor(s.company))}"><div class="who"><b>${esc(s.name)}</b><small>${s.status==="declined"?"request declined":"checked out"}${s.bed?" · "+esc(bedLabel(s.bed)):""}</small></div><span class="when">${fmt(s.arrive)} → ${fmt(s.depart)}</span></div>`, "No past stays.");
+  const mb = $("#mineBadge"); const pc=changes.filter(c=>c.status==="pending").length; mb.hidden=!pc; mb.textContent=pc;
+  host.querySelectorAll("[data-chg]").forEach(b=>b.onclick=()=>{ mineEdit=b.dataset.chg; renderMine(); host.querySelector(".cDepart")?.focus(); });
+  host.querySelectorAll("[data-cancelchg]").forEach(b=>b.onclick=()=>{ mineEdit=null; renderMine(); });
+  host.querySelectorAll("[data-plus]").forEach(b=>b.onclick=()=>{ const inp=host.querySelector(".cDepart"); inp.value=addDays(inp.value||t, Number(b.dataset.plus)); });
+  host.querySelectorAll("[data-send]").forEach(b=>b.onclick=async()=>{
+    const box=b.closest(".chg"), m=box.querySelector(".cMsg");
+    const arrive=box.querySelector(".cArrive").value, depart=box.querySelector(".cDepart").value, email=box.querySelector(".cEmail").value.trim(), note=box.querySelector(".cNote").value.trim();
+    if(!arrive||!depart||depart<arrive){ m.hidden=false; m.textContent="Departure must be on or after arrival."; return; }
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ m.hidden=false; m.textContent="A valid email is required so we can tell you the answer."; return; }
+    b.disabled=true;
+    try{ const {error}=await sb.rpc("request_change",{p_stay:b.dataset.send,p_arrive:arrive,p_depart:depart,p_email:email,p_note:note}); if(error) throw error; rememberEmail(email); mineEdit=null; toast("Change request sent to the camp coordinator"); await loadAll(); }
+    catch(e){ m.hidden=false; m.textContent=e.message; b.disabled=false; }
+  });
+}
+
+/* ---- exports (print to PDF / CSV) ---- */
+function openPrint(title, body){
+  const w=window.open("","_blank"); if(!w) return toast("Allow pop-ups for mgmcamp.com to print.");
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+  body{font-family:Lato,Arial,sans-serif;color:#1c1a16;margin:16px;font-size:11.5px}
+  h1{font-size:18px;margin:0 0 2px} .sub{color:#6a6457;margin:0 0 12px}
+  table{border-collapse:collapse;width:100%} th,td{border:1px solid #cfc8b8;padding:4px 6px;text-align:left;vertical-align:top} th{background:#f0ece2;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px} .rm{border:1px solid #cfc8b8;border-left-width:5px;border-radius:5px;padding:5px 6px;min-height:70px;break-inside:avoid}
+  .rm .n{font-weight:700;font-family:monospace;font-size:12.5px;display:flex;justify-content:space-between} .rm .p{font-weight:700;margin-top:2px} .rm .m{color:#6a6457;font-size:10.5px}
+  .rm.free{background:#f4f8f2;border-left-color:#5a8f29} .rm.free .p{color:#2f6a12} .rm .nt{font-size:10px;margin-top:2px}
+  .sec{margin:14px 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#6a6457;border-bottom:2px solid #d7b973}
+  .day{break-inside:avoid;margin-bottom:12px} .day h2{font-size:14px;margin:0 0 4px;border-bottom:2px solid #d7b973;padding-bottom:2px} .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tag{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6a6457}
+  @page{size:landscape;margin:10mm} @media print{.noprint{display:none}}
+  </style></head><body><button class="noprint" onclick="print()" style="float:right;padding:6px 12px">Print / Save as PDF</button><h1>Maple Gold Mines · Camp Board</h1><p class="sub">${esc(title)} · printed ${new Date().toLocaleString()}</p>${body}</body></html>`);
+  w.document.close();
+}
+function planOrder(){
+  // every room on the drawing, in drawing order, then any layout room not on the drawing
+  const idx=roomIndex(), seen=new Set(), out=[];
+  const push=(entry,where)=>{ if(typeof entry!=="number" && !/^[A-Z]{1,2}\d+$/.test(entry)) return; const hit=idx.get(String(entry).toUpperCase()); if(!hit||seen.has(hit.room.id)) return; seen.add(hit.room.id); out.push({...hit, where}); };
+  PLAN_EAST.forEach(e=>push(e,"Main camp · east side (odd)")); PLAN_WEST.forEach(e=>push(e,"Main camp · west side (even)"));
+  PLAN_BLOC_A.forEach(e=>push(e,"Bloc A")); PLAN_BLOC_B.forEach(e=>push(e,"Bloc B"));
+  (layout?.sections||[]).forEach(sec=>sec.rooms.forEach(room=>{ if(!seen.has(room.id)){ seen.add(room.id); out.push({sec,room,where:"Other rooms"}); } }));
+  return out;
+}
+function printPlan(){
+  if(!layout) return toast("No layout yet.");
+  const t=today(); const groups={};
+  planOrder().forEach(x=>(groups[x.where]=groups[x.where]||[]).push(x));
+  const rmCard=({sec,room})=>{ let inner=""; for(let i=1;i<=room.beds;i++){ const key=bedKey(sec.id,room.id,i); const {now,next}=bedInfo(key); const who=now||next; const col=who?companyColor(who.company):"#5a8f29";
+      inner += who ? `<div class="rm" style="border-left-color:${esc(col)}"><div class="n"><span>${esc(room.name)}${room.beds>1?` · bed ${i}`:""}</span><span class="tag">${shiftText(who)}${now?"":" · reserved"}</span></div><div class="p">${esc(who.name)}</div><div class="m">${esc(who.company)}</div><div class="m">${fmt(who.arrive)} → ${fmt(who.depart)}${who.depart<t?" · OVERDUE":""}</div>${who.notes?`<div class="nt">${esc(who.notes)}</div>`:""}</div>`
+                   : `<div class="rm free"><div class="n"><span>${esc(room.name)}${room.beds>1?` · bed ${i}`:""}</span></div><div class="p">Free</div></div>`; } return inner; };
+  let body = Object.entries(groups).map(([w,list])=>`<div class="sec">${esc(w)}</div><div class="grid">${list.map(rmCard).join("")}</div>`).join("");
+  const rows=stays.filter(s=>s.status==="assigned").map(s=>({...s,room:roomNameOf(s.bed)})).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true}));
+  body += `<div class="sec" style="break-before:page">Everyone in camp · ${rows.length} people · sorted by room</div><table><thead><tr><th>Room</th><th>Name</th><th>Company</th><th>Shift</th><th>Check in</th><th>Check out</th><th>Days left</th><th>Notes</th><th>Requested by</th></tr></thead><tbody>${rows.map(s=>`<tr><td>${esc(s.room)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.company)}</td><td>${shiftText(s)}</td><td>${fmt(s.arrive)}</td><td>${fmt(s.depart)}</td><td>${daysUntil(s.depart)}</td><td>${esc(s.notes||"")}</td><td>${esc(s.requester_email||"")}</td></tr>`).join("")}</tbody></table>`;
+  const pend=stays.filter(s=>s.status==="requested");
+  if(pend.length) body += `<div class="sec">Requests waiting for a room · ${pend.length}</div><table><thead><tr><th>Name</th><th>Company</th><th>Shift</th><th>Arrival</th><th>Departure</th><th>Notes</th><th>Requested by</th></tr></thead><tbody>${pend.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.company)}</td><td>${shiftText(s)}</td><td>${fmt(s.arrive)}</td><td>${fmt(s.depart)}</td><td>${esc(s.notes||"")}</td><td>${esc(s.requester_email||"")}</td></tr>`).join("")}</tbody></table>`;
+  openPrint(`Floor plan and occupants · ${fmt(t)}`, body);
+}
+function weekRange(which){
+  const t=today(); if(which==="7") return [t, addDays(t,7)];
+  const d=new Date(t+"T12:00:00"); const dow=(d.getDay()+6)%7; let mon=addDays(t,-dow); if(which==="next") mon=addDays(mon,7);
+  return [mon, addDays(mon,6)];
+}
+function printWeek(){
+  if(!layout) return toast("No layout yet.");
+  const [from,to]=weekRange($("#weekPick").value); const t=today();
+  const assigned=stays.filter(s=>s.status==="assigned").map(s=>({...s,room:roomNameOf(s.bed)}));
+  const byRoom=(a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true});
+  const line=s=>`<tr><td><b>${esc(s.room)}</b></td><td>${esc(s.name)}</td><td>${esc(s.company)}</td><td>${shiftText(s)}</td><td>${esc(s.notes||"")}</td></tr>`;
+  const tbl=(title,list)=>`<div><div class="tag">${title} · ${list.length}</div>${list.length?`<table><thead><tr><th>Room</th><th>Name</th><th>Company</th><th>Shift</th><th>Notes</th></tr></thead><tbody>${list.sort(byRoom).map(line).join("")}</tbody></table>`:`<p style="color:#6a6457;margin:4px 0">None</p>`}</div>`;
+  let body="", d=from;
+  while(d<=to){ const dd=new Date(d+"T12:00:00").toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+    body += `<div class="day"><h2>${dd}${d===t?" · today":""}</h2><div class="two">${tbl("Leaving (room to clean)", assigned.filter(s=>s.depart===d))}${tbl("Arriving (room to prepare)", assigned.filter(s=>s.arrive===d))}</div></div>`;
+    d=addDays(d,1); }
+  const over=assigned.filter(s=>s.depart<t);
+  if(over.length) body += `<div class="day"><h2>Past departure date, still in a bed</h2>${tbl("Check with the coordinator", over)}</div>`;
+  openPrint(`Departures and arrivals · ${fmt(from)} to ${fmt(to)}`, body);
+}
+function downloadCsv(){
+  const rows=stays.filter(s=>s.status==="assigned"||s.status==="requested").map(s=>({...s,room:roomNameOf(s.bed)})).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true}));
+  const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  const csv=[["Status","Room","Name","Company","Shift","Check in","Check out","Days left","Notes","Requested by"].join(","), ...rows.map(s=>[s.status,s.room,s.name,s.company,shiftText(s),s.arrive,s.depart,daysUntil(s.depart),s.notes,s.requester_email].map(q).join(","))].join("\r\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"})); a.download=`camp-board-${today()}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+$("#btnPrintPlan").onclick=printPlan; $("#btnPrintWeek").onclick=printWeek; $("#btnCsv").onclick=downloadCsv;
 
 /* ---- auth ---- */
 $("#loginForm").onsubmit=async e=>{
@@ -858,13 +1055,13 @@ sb.auth.onAuthStateChange((event, s) => {
     if (seq !== authSeq) return;
     if (event==="PASSWORD_RECOVERY"){ const np=prompt("Choose a new password (8+ characters):"); if(np){ const {error}=await sb.auth.updateUser({password:np}); toast(error?error.message:"Password updated"); } }
     const couldView = canView;
-    if (s){ const {data} = await sb.rpc("my_role"); role = data||null; }
-    else role = null;
-    isAdmin = role==="admin"; canView = !!role;
+    if (s){ const [r,c] = await Promise.all([sb.rpc("my_role"), sb.rpc("my_company")]); role = r.data||null; myCompany = c.data||null; }
+    else { role = null; myCompany = null; }
+    isAdmin = role==="admin"; isCompany = role==="company"; canBoard = role==="admin"||role==="viewer"; canView = !!role;
     if (s && !canView) showMsg("#loginMsg","This account is signed in but has no access to the board. Ask the camp admin.","err");
-    if (canView && !couldView && (location.hash==="#admin"||!location.hash)) location.hash="#map";
+    if (canView && !couldView && (location.hash==="#admin"||!location.hash)) location.hash = canBoard ? "#map" : "#mine";
     if (event==="SIGNED_OUT") { closeDrawer(); mode=null; editing=false; editLayout=null; location.hash="#request"; showMsg("#loginMsg",""); toast("Signed out"); }
-    loaded=false; layout=null; stays=[]; settings=null;
+    loaded=false; layout=null; stays=[]; settings=null; changes=[]; members=[]; mineEdit=null;
     await loadAll(); subscribe(); render();
   }, 0);
 });
