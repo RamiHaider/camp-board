@@ -946,11 +946,12 @@ $("#reqForm").onsubmit=async e=>{
 function renderMine(){
   const host=$("#mineHost"); const t=today();
   const byDepart=(a,b)=>a.depart<b.depart?-1:1;
-  const assigned=stays.filter(s=>s.status==="assigned");
+  const mine=stays.filter(s=>!s.foreign);
+  const assigned=mine.filter(s=>s.status==="assigned");
   const inCamp=assigned.filter(s=>s.arrive<=t).sort(byDepart);
   const upcoming=assigned.filter(s=>s.arrive>t).sort((a,b)=>a.arrive<b.arrive?-1:1);
-  const pending=stays.filter(s=>s.status==="requested").sort((a,b)=>a.arrive<b.arrive?-1:1);
-  const closed=stays.filter(s=>s.status==="checked_out"||s.status==="declined").sort((a,b)=>(b.closed_at||"")<(a.closed_at||"")?-1:1).slice(0,40);
+  const pending=mine.filter(s=>s.status==="requested").sort((a,b)=>a.arrive<b.arrive?-1:1);
+  const closed=mine.filter(s=>s.status==="checked_out"||s.status==="declined").sort((a,b)=>(b.closed_at||"")<(a.closed_at||"")?-1:1).slice(0,40);
   const pendingFor = id => changes.find(c=>c.stay_id===id && c.status==="pending");
   const row = s => {
     const pc=pendingFor(s.id);
@@ -1120,10 +1121,14 @@ const FR = {
 "Signed out":"Déconnecté","Saved":"Enregistré","Request declined":"Demande refusée","Layout saved":"Plan enregistré","Removed":"Retiré",
 "Editing layout":"Modification du plan","Save layout":"Enregistrer le plan","+ Room":"+ Chambre","Remove section":"Retirer la section","+ Add section":"+ Ajouter une section",
 "Moving":"Déplacement de","Assigning":"Assignation de","Click a free bed on the map. Beds that are taken during":"Cliquez un lit libre sur le plan. Les lits occupés du","are dimmed.":"sont grisés.",
+"The":"Le","shows your people by name and other companies' rooms as Reserved.":"montre vos gens par nom et les chambres des autres compagnies comme Réservé.",
+"on a person sends an extension or date-change request to the camp coordinator, who approves or declines it, and you get an email either way. To add people, use":"sur une personne envoie une demande de prolongation ou de changement de dates au coordonnateur du camp, qui l'approuve ou la refuse; vous recevez un courriel dans les deux cas. Pour ajouter des gens, utilisez",
+"Set up the camp":"Configurer le camp","No rooms yet. Start from a small template and change the names, rooms and beds to match the real camp. You can edit the layout any time from the map.":"Aucune chambre pour l'instant. Partez d'un petit modèle et ajustez noms, chambres et lits au vrai camp. Le plan se modifie à tout moment depuis la carte.","Create the starter layout below.":"Créez le plan de départ ci-dessous.","Press":"Appuyez sur","on the map and fix section names, rooms and bed counts.":"sur le plan et corrigez les sections, chambres et nombres de lits.","Share this link with whoever puts in bed requests.":"Partagez ce lien avec ceux qui font des demandes de lits.","Create starter layout (2 sections)":"Créer le plan de départ (2 sections)",
+"Sent":"Envoyé","for":"pour","Confirmation and room details will go to":"La confirmation et la chambre seront envoyées à","once the camp admin assigns beds.":"une fois les lits assignés par l'administrateur.","This account is signed in but has no access to the board. Ask the camp admin.":"Ce compte est connecté mais n'a pas accès au tableau. Demandez à l'administrateur du camp.","Check your email for a reset link.":"Vérifiez vos courriels pour le lien de réinitialisation.","Type your email first.":"Entrez d'abord votre courriel.","What requesters can pick from. A company typed under \"Other\" stays on that request only until you add it here or assign that person to a bed.":"Ce que les demandeurs peuvent choisir. Une compagnie tapée sous « Autre » reste sur cette demande seulement, jusqu'à ce que vous l'ajoutiez ici ou assigniez la personne à un lit.",
 "Rename sections and rooms, change bed counts, add or remove rooms. Rooms with people in them cannot be removed.":"Renommez les sections et chambres, changez le nombre de lits, ajoutez ou retirez des chambres. Les chambres occupées ne peuvent pas être retirées.",
 };
 const FR_RX = [
-  [/^(\d+) free of (\d+)$/, "$1 libres sur $2"], [/^(\d+) of (\d+)$/, "$1 sur $2"], [/^(\d+) days? left$/, "$1 jours restants"], [/^(\d+) days? overdue$/, "$1 jours de retard"],
+  [/^(\d+) free of (\d+)$/, "$1 libres sur $2"], [/^beds free now · of (\d+)$/, "lits libres · sur $1"], [/^Sent (.+) for$/, "Envoyé le $1 pour"], [/^(\d+) of (\d+)$/, "$1 sur $2"], [/^(\d+) days? left$/, "$1 jours restants"], [/^(\d+) days? overdue$/, "$1 jours de retard"],
   [/^\((\d+) days? left\)$/, "($1 jours restants)"], [/^\((\d+) days? overdue\)$/, "($1 jours de retard)"], [/^Person (\d+)$/, "Personne $1"], [/^(\d+) (bed|beds)$/, "$1 lits"], [/^Room (.+)$/, "Chambre $1"],
   [/^Signed in as (.+) \(admin, can change the board\)\.$/, "Connecté en tant que $1 (admin, peut modifier le tableau)."], [/^Signed in as (.+) \(viewer, read only\)\.$/, "Connecté en tant que $1 (lecture seulement)."], [/^Signed in as (.+) \(company portal for (.+), sees its own people only\)\.$/, "Connecté en tant que $1 (portail de $2, voit ses propres gens seulement)."],
   [/^Requesting for (.+)\. The confirmation goes to the email below\.$/, "Demande pour $1. La confirmation ira au courriel ci-dessous."], [/^Request beds for (.+)$/, "Demander des lits pour $1"], [/^Reserved by another company until (.+)\.$/, "Réservé par une autre compagnie jusqu'au $1."],
