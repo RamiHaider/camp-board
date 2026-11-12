@@ -171,3 +171,17 @@ alter table change_requests enable row level security;
 --   decide_change(p_id, p_approve, p_note)                       -- admin; approve applies the dates after a bed-clash check
 -- trigger change_requests_notify -> notify_change() posts change_requested / change_decided to the notify function.
 -- live definitions: migration applied 2026-11-12 through the Supabase MCP (see NOTES.md).
+
+-- ---------- feedback button (2026-11-12) ----------
+-- Anyone on the page (visitor or signed in) can send a bug / UX note / idea. Stored, then emailed to the maintainer
+-- (FEEDBACK_TO in supabase/functions/notify/index.ts, event 'feedback'). Admins can read the table; nobody else.
+create table if not exists feedback (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null default 'other' check (kind in ('bug','ux','idea','other')),
+  message text not null, email text, page text, user_email text, user_agent text,
+  created_at timestamptz not null default now()
+);
+alter table feedback enable row level security;
+drop policy if exists admin_all on feedback; create policy admin_all on feedback for all to authenticated using (is_admin()) with check (is_admin());
+-- submit_feedback(p_kind, p_message, p_email default '', p_page default '', p_user_agent default '') : public RPC, 60/hour cap,
+--   records auth.jwt() email when signed in. Trigger feedback_notify -> notify_feedback() posts {event:'feedback', feedback_id}.

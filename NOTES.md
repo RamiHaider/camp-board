@@ -48,3 +48,12 @@ Under the plan: "People in camp" roster with a search box (name, company, room, 
 - Free Supabase projects pause after 7 days with no traffic; click Restore in the dashboard.
 - GitHub Pages caches the page for ~10 minutes; hard refresh (Ctrl+Shift+R) after a deploy.
 - The shared viewer account has no real inbox, so no password reset; an admin rotates it in the database.
+
+## Feedback button (2026-11-12)
+
+Round "Feedback" button fixed bottom-right on every view, FR/EN. Opens a small panel: type (Bug / Look & feel / Idea / Other),
+message, optional email (hidden when signed in, the login email is recorded instead). Calls public RPC `submit_feedback`,
+row lands in table `feedback` (admin-readable), trigger posts event `feedback` to the notify function, which emails the
+maintainer at the address in `FEEDBACK_TO` (rahaider@maplegoldmines.com) with reply-to set to the sender when known.
+Rate cap 60 messages/hour across the site. Password resets are handled by the maintainer on request instead of the
+Supabase Site URL flow, so that setting was left alone.

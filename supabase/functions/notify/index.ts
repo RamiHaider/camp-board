@@ -1,10 +1,12 @@
 // Camp Board notifications. Called by the stays_notify database trigger (see supabase/schema.sql).
 // Sends: receipt to requester + heads-up to admins on a new request; confirmation to requester on
-// assignment or change; decline note; date-change requests from company portals and their decisions. Secrets: RESEND_API_KEY (Edge Function secret).
+// assignment or change; decline note; date-change requests from company portals and their decisions;
+// feedback from the page's Feedback button to the maintainer. Secrets: RESEND_API_KEY (Edge Function secret).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SITE = "https://mgmcamp.com";
 const FROM = "MGM Camp Board <noreply@mgmcamp.com>";
+const FEEDBACK_TO = ["rahaider@maplegoldmines.com"]; // the site maintainer; bugs and UX notes from the Feedback button land here
 
 const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -35,13 +37,13 @@ function wrap(title: string, body: string) {
 }
 const row = (k: string, v: string) => `<tr><td style="padding:4px 10px 4px 0;color:#6a6457;white-space:nowrap">${esc(k)}</td><td style="padding:4px 0">${v}</td></tr>`;
 
-async function send(to: string[], subject: string, html: string) {
+async function send(to: string[], subject: string, html: string, replyTo?: string) {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) { console.error("RESEND_API_KEY is not set"); return { skipped: true }; }
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: FROM, to, subject, html }),
+    body: JSON.stringify({ from: FROM, to, subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) console.error("resend error", r.status, JSON.stringify(j));
@@ -53,7 +55,20 @@ Deno.serve(async (req) => {
   const { data: settings } = await sb.from("settings").select("hook_secret").eq("id", "main").single();
   if (!settings || req.headers.get("x-camp-hook") !== settings.hook_secret) return new Response("forbidden", { status: 403 });
 
-  const { event, stay_id, old, change_id } = await req.json();
+  const { event, stay_id, old, change_id, feedback_id } = await req.json();
+
+  if (event === "feedback" && feedback_id) {
+    const { data: f } = await sb.from("feedback").select("*").eq("id", feedback_id).single();
+    if (!f) return new Response("no feedback", { status: 404 });
+    const kind = ({ bug: "Bug", ux: "UX / UI", idea: "Idea", other: "Other" } as Record<string, string>)[f.kind] ?? "Other";
+    const who = f.user_email ? `${f.user_email} (signed in)` : (f.email || "anonymous");
+    const tbl = `<table style="font-size:14px;border-collapse:collapse">${row("Type", esc(kind))}${row("From", esc(who))}${f.page ? row("Page", esc(f.page)) : ""}${row("Sent", new Date(f.created_at).toLocaleString("en-CA", { timeZone: "America/Toronto" }))}${f.user_agent ? row("Browser", `<span style="color:#6a6457;font-size:12px">${esc(f.user_agent)}</span>`) : ""}</table>`;
+    const msg = `<div style="white-space:pre-wrap;background:#f6f4ef;border:1px solid #d9d3c4;border-radius:8px;padding:12px;margin:12px 0;font-size:14px">${esc(f.message)}</div>`;
+    const reply = f.email || f.user_email;
+    const sent = await send(FEEDBACK_TO, `Camp Board feedback (${kind}): ${f.message.slice(0, 60).replace(/\s+/g, " ")}${f.message.length > 60 ? "…" : ""}`,
+      wrap(`${kind} feedback`, `${tbl}${msg}${reply ? `<p style="margin:0;font-size:13px;color:#6a6457">Reply to <a href="mailto:${esc(reply)}" style="color:#a8842f">${esc(reply)}</a></p>` : ""}`), reply || undefined);
+    return new Response(JSON.stringify({ event, sent: [sent] }), { headers: { "Content-Type": "application/json" } });
+  }
   const [{ data: s }, { data: layoutRow }, { data: admins }] = await Promise.all([
     sb.from("stays").select("*").eq("id", stay_id).single(),
     sb.from("layout").select("sections").eq("id", "main").maybeSingle(),
