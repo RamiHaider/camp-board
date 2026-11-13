@@ -44,6 +44,14 @@ Under the plan: "People in camp" roster with a search box (name, company, room, 
 - A company login's home is the **Map**: its own people by name, every other occupied bed hatched grey as "Reserved" (no name, no company), free beds green. Data comes from `bed_occupancy()` (bed, arrive, depart only; members only). The roster, stats and "My people" lists show only the company's own people. No exports, no Add person.
 - **FR / EN button** in the header. The page is written in English; French is applied to the DOM after each render from the `FR` dictionary and `FR_RX` patterns in `index.html` (add new UI strings there, in both). Choice is remembered per browser; default follows the browser language. Dates follow the language. `notranslate` meta stops Chrome's Google Translate from fighting it.
 
+## Company sections (2026-11-13, from the coordinator's feedback)
+Sections in the layout are now company areas, not just physical blocks. Decisions from the coordinator: a free room stays counted as available but keeps its company tag; placing someone from another company in a tagged room is blocked with a confirm dialog; no automatic assignment (companies still request, the admin places); rooms are released one at a time; a tag on the map is enough, no renaming needed.
+- A section has an optional `company` (dropdown in Edit layout). If none is picked, a section whose name matches a company name counts as that company's. Picking a company on a section still named `Section N` renames it after the company.
+- Map: a room in a company section gets a colored top bar plus a small company tag (admins and viewers only; company portals see nothing). Legend entry "Top bar = company section". Print floor plan shows the section under free rooms.
+- Edit layout: every room has a "Move to section" dropdown. Bed keys are `section/room/n`, so on save the stays of moved rooms (current and past) are re-keyed to the new section first; if the layout then fails to save, the beds are put back. New sections start empty; new rooms default to 1 bed.
+- Rename fix: a room remembers its place on the drawing in `room.plan` (set when Edit layout opens, for names that exist on the drawing). The drawing matches by `plan` first, then by name, so renaming `62` to `62-FTE` no longer drops it into "Other rooms". Edit layout shows the drawing position next to a renamed room.
+- Confirm text is in both languages; other new strings are in the FR table.
+
 ## Known limits
 - Free Supabase projects pause after 7 days with no traffic; click Restore in the dashboard.
 - GitHub Pages caches the page for ~10 minutes; hard refresh (Ctrl+Shift+R) after a deploy.

@@ -180,6 +180,15 @@ th{color:var(--muted);font-weight:500;font-size:12px}
 .cell .rn{font-family:var(--mono);font-size:10.5px;color:var(--muted);line-height:1;display:flex;justify-content:space-between;align-items:baseline}
 .cell .rn small{font-family:var(--font);font-size:7.5px;text-transform:uppercase;letter-spacing:.04em}
 .cell.sel{outline:2px solid var(--accent);outline-offset:-2px;z-index:1}
+.cell.zoned{box-shadow:inset 0 3px 0 var(--zc)}
+.cell .rn .zone{font-family:var(--font);font-size:7px;font-weight:700;letter-spacing:.02em;color:var(--zc);max-width:30px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase}
+.section.edit-sec .rooms,.sections.edit .rooms{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.editrow{flex-wrap:wrap}
+.editrow input[data-f=name]{flex:1 1 70px;min-width:60px}
+.editrow input[type=number]{flex:0 0 54px;width:54px}
+.editrow select{flex:1 1 90px;width:auto;max-width:150px;font-size:12px;padding:6px 4px}
+.editrow .onplan{font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap}
+.section header select{font-size:12.5px;width:auto;max-width:240px}
 .plan .bed{min-height:22px;padding:2px 4px;border-left-width:4px;border-radius:4px;flex:1;gap:0}
 .plan .bed .n{font-size:10px;font-weight:600;padding-right:8px}
 .plan .bed .s{display:none}
@@ -391,6 +400,20 @@ const uid = () => Math.random().toString(36).slice(2,10);
 const bedKey = (s,r,n) => `${s}/${r}/${n}`;
 const bedLabel = key => { if(!key||!layout) return "—"; const [s,r,n] = key.split("/"); const sec = layout.sections.find(x=>x.id===s); const room = sec?.rooms.find(x=>x.id===r); return sec && room ? `${sec.name} · ${room.name} · bed ${n}` : key; };
 const companyColor = name => companies.find(c => c.name.toLowerCase() === String(name||"").toLowerCase())?.color || "#7a8a84";
+/* company sections: a section may belong to a company (sec.company, or its name matches a company). Rooms keep that
+   tag whether they are occupied or free; placing someone from another company there asks for confirmation. */
+const sameCompany = (a,b) => String(a||"").trim().toLowerCase() === String(b||"").trim().toLowerCase();
+const sectionCompany = sec => { if(!sec) return null; const n=String(sec.company||sec.name||"").trim(); if(!n) return null; const c=companies.find(x=>sameCompany(x.name,n)); return c ? c.name : (sec.company ? n : null); };
+const sectionOfBed = key => { if(!key||!layout) return null; const s=key.split("/")[0]; return layout.sections.find(x=>x.id===s)||null; };
+const zoneOfBed = key => sectionCompany(sectionOfBed(key));
+function confirmZone(key, company){
+  const z=zoneOfBed(key); if(!z || sameCompany(z,company)) return true;
+  const who = company || (lang==="fr" ? "Cette personne" : "This person");
+  return window.confirm(lang==="fr" ? `Cette chambre fait partie de la section ${z}. ${who} n'est pas de ${z}.\n\nLa placer ici quand même ?`
+                                     : `This room belongs to the ${z} section. ${who} is not from ${z}.\n\nPlace them here anyway?`);
+}
+/* the drawing names a room by room.plan (set once, survives renames) or, failing that, by its current name */
+const PLAN_ALL = new Set([...PLAN_WEST,...PLAN_EAST,...PLAN_BLOC_B,...PLAN_BLOC_A].map(e=>String(e).toUpperCase()));
 function stayState(s){
   if (s.status !== "assigned") return null;
   if (s.foreign) return "taken";
@@ -524,7 +547,7 @@ function renderMap(){
     mb.querySelector("#cancelMode").onclick = () => { mode=null; render(); };
   } else if (editing) {
     mb.hidden=false;
-    mb.innerHTML = `<b>Editing layout</b><span class="note">Rename sections and rooms, change bed counts, add or remove rooms. Rooms with people in them cannot be removed.</span><button class="btn sm primary" id="saveLayout">Save layout</button><button class="btn sm" id="cancelLayout">Cancel</button>`;
+    mb.innerHTML = `<b>Editing layout</b><span class="note">Name sections after companies and pick the company, move rooms between sections, rename rooms, change bed counts. Rooms with people in them cannot be removed.</span><button class="btn sm primary" id="saveLayout">Save layout</button><button class="btn sm" id="cancelLayout">Cancel</button>`;
     mb.querySelector("#saveLayout").onclick = saveLayout;
     mb.querySelector("#cancelLayout").onclick = () => { editing=false; editLayout=null; render(); };
   } else mb.hidden=true;
@@ -538,7 +561,7 @@ function renderMap(){
     const bedCount = sec.rooms.reduce((a,r)=>a+Number(r.beds||0),0);
     let free=0; sec.rooms.forEach(r=>{for(let i=1;i<=r.beds;i++) if(!bedInfo(bedKey(sec.id,r.id,i)).now) free++;});
     const head = editing
-      ? `<header><input value="${esc(sec.name)}" data-sec="${sec.id}" data-f="name" aria-label="Section name" style="max-width:240px"><button class="btn sm" data-addroom="${sec.id}">+ Room</button><button class="btn sm danger" data-delsec="${sec.id}">Remove section</button></header>`
+      ? `<header><input value="${esc(sec.name)}" data-sec="${sec.id}" data-f="name" aria-label="Section name" style="max-width:240px"><select data-seccompany="${sec.id}" aria-label="Company for this section"><option value="">No company</option>${companies.map(c=>`<option value="${esc(c.name)}"${sameCompany(sec.company,c.name)?" selected":""}>${esc(c.name)}</option>`).join("")}</select><span class="cnt num">${sec.rooms.length} ${sec.rooms.length===1?"room":"rooms"}</span><button class="btn sm" data-addroom="${sec.id}">+ Room</button><button class="btn sm danger" data-delsec="${sec.id}">Remove section</button></header>`
       : `<header><h2>${esc(sec.name)}</h2><span class="cnt num">${free} free of ${bedCount}</span></header>`;
     const rooms = sec.rooms.map(r => {
       let beds = "";
@@ -555,7 +578,7 @@ function renderMap(){
         beds += `<button type="button" class="${cls}" data-bed="${key}" ${stripe} title="${esc(bedLabel(key))}"><span class="n">${esc(name)}</span><span class="s">${esc(sub)}</span></button>`;
       }
       const rn = editing
-        ? `<div class="editrow"><input value="${esc(r.name)}" data-sec="${sec.id}" data-room="${r.id}" data-f="name" aria-label="Room name"><input type="number" min="1" max="12" value="${r.beds}" data-sec="${sec.id}" data-room="${r.id}" data-f="beds" aria-label="Beds"><button class="btn sm danger" data-delroom="${sec.id}/${r.id}" title="Remove room">×</button></div>`
+        ? `<div class="editrow"><input value="${esc(r.name)}" data-sec="${sec.id}" data-room="${r.id}" data-f="name" aria-label="Room name"><input type="number" min="1" max="12" value="${r.beds}" data-sec="${sec.id}" data-room="${r.id}" data-f="beds" aria-label="Beds"><select data-moveroom="${sec.id}/${r.id}" aria-label="Move to section" title="Move to section">${L.sections.map(s2=>`<option value="${s2.id}"${s2.id===sec.id?" selected":""}>${esc(s2.name||"(unnamed)")}</option>`).join("")}</select>${r.plan && !sameCompany(r.plan,r.name)?`<span class="onplan" title="Position on the drawing">${esc(r.plan)}</span>`:""}<button class="btn sm danger" data-delroom="${sec.id}/${r.id}" title="Remove room">×</button></div>`
         : `<div class="rn"><span>${esc(r.name)}</span><span class="num">${r.beds} ${r.beds===1?"bed":"beds"}</span></div>`;
       return `<div class="room">${rn}${beds}</div>`;
     }).join("");
@@ -568,7 +591,17 @@ function renderMap(){
       const tgt = inp.dataset.room ? sec.rooms.find(r=>r.id===inp.dataset.room) : sec;
       tgt[inp.dataset.f] = inp.dataset.f==="beds" ? Math.max(1, Math.min(12, Number(inp.value)||1)) : inp.value;
     });
-    host.querySelectorAll("[data-addroom]").forEach(b => b.onclick = () => { const sec=editLayout.sections.find(s=>s.id===b.dataset.addroom); sec.rooms.push({id:uid(), name:`Room ${sec.rooms.length+1}`, beds:2}); render(); });
+    host.querySelectorAll("[data-seccompany]").forEach(sel => sel.onchange = () => {
+      const sec=editLayout.sections.find(s=>s.id===sel.dataset.seccompany); sec.company = sel.value||null;
+      if (sel.value && (!sec.name.trim() || /^Section \d+$/.test(sec.name.trim()))) sec.name = sel.value; // default name follows the company
+      render();
+    });
+    host.querySelectorAll("[data-moveroom]").forEach(sel => sel.onchange = () => {
+      const [sid,rid]=sel.dataset.moveroom.split("/"); const from=editLayout.sections.find(s=>s.id===sid), to=editLayout.sections.find(s=>s.id===sel.value);
+      if(!from||!to||from===to) return; const room=from.rooms.find(r=>r.id===rid); from.rooms=from.rooms.filter(r=>r.id!==rid); to.rooms.push(room);
+      to.rooms.sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true})); render();
+    });
+    host.querySelectorAll("[data-addroom]").forEach(b => b.onclick = () => { const sec=editLayout.sections.find(s=>s.id===b.dataset.addroom); sec.rooms.push({id:uid(), name:`Room ${sec.rooms.length+1}`, beds:1}); render(); });
     host.querySelectorAll("[data-delroom]").forEach(b => b.onclick = () => {
       const [sid,rid] = b.dataset.delroom.split("/"); const sec=editLayout.sections.find(s=>s.id===sid);
       if (stays.some(s=>s.status==="assigned" && s.bed?.startsWith(`${sid}/${rid}/`))) return toast("That room has people assigned. Move or check them out first.");
@@ -579,14 +612,19 @@ function renderMap(){
       if (stays.some(s=>s.status==="assigned" && s.bed?.startsWith(sid+"/"))) return toast("That section has people assigned. Move or check them out first.");
       editLayout.sections = editLayout.sections.filter(s=>s.id!==sid); render();
     });
-    const add = host.querySelector("#addSec"); if (add) add.onclick = () => { editLayout.sections.push({id:uid(), name:`Section ${editLayout.sections.length+1}`, rooms:[{id:uid(),name:"Room 1",beds:2}]}); render(); };
+    const add = host.querySelector("#addSec"); if (add) add.onclick = () => { editLayout.sections.push({id:uid(), name:`Section ${editLayout.sections.length+1}`, company:null, rooms:[]}); render(); };
   } else {
     host.querySelectorAll(".bed").forEach(b => b.onclick = () => onBedClick(b.dataset.bed));
   }
 }
 
 /* ---- floor plan render ---- */
-function roomIndex(){ const m=new Map(); (layout?.sections||[]).forEach(sec=>sec.rooms.forEach(room=>m.set(String(room.name).trim().toUpperCase(),{sec,room}))); return m; }
+function roomIndex(){
+  const m=new Map(), all=[]; (layout?.sections||[]).forEach(sec=>sec.rooms.forEach(room=>all.push({sec,room})));
+  all.forEach(h=>{ if(h.room.plan) m.set(String(h.room.plan).trim().toUpperCase(), h); });
+  all.forEach(h=>{ const k=String(h.room.name).trim().toUpperCase(); if(!m.has(k)) m.set(k,h); });
+  return m;
+}
 function roomNameOf(key){ if(!key||!layout) return ""; const [s,r]=key.split("/"); return layout.sections.find(x=>x.id===s)?.rooms.find(x=>x.id===r)?.name||""; }
 function bedBtn(key, modeStay, hasFilter){
   const {now,next}=bedInfo(key);
@@ -610,7 +648,9 @@ function planCell(entry, idx, modeStay, hasFilter, used){
   const sel = !!selectedBed && selectedBed.startsWith(`${hit.sec.id}/${hit.room.id}/`);
   let ptr=""; if (sel){ const {now}=bedInfo(selectedBed); ptr=`<span class="ptr">${now?esc(now.name.split(" ")[0]):"here"}</span>`; }
   const note = PLAN_NOTES[name] ? `<small>${esc(PLAN_NOTES[name])}</small>` : "";
-  return `<div class="cell${sel?" sel":""}" data-room="${esc(name)}">${ptr}<span class="rn"><span>${esc(name)}</span>${note}</span>${beds}</div>`;
+  const zone = isCompany ? null : sectionCompany(hit.sec);
+  const ztag = zone ? `<small class="zone" title="${esc(zone)} section">${esc(zone)}</small>` : "";
+  return `<div class="cell${sel?" sel":""}${zone?" zoned":""}" data-room="${esc(name)}"${zone?` style="--zc:${esc(companyColor(zone))}"`:""}>${ptr}<span class="rn"><span>${esc(name)}</span>${note}${ztag}</span>${beds}</div>`;
 }
 function renderPlan(host, modeStay, hasFilter){
   const idx=roomIndex(), used=new Set();
@@ -629,7 +669,7 @@ function renderPlan(host, modeStay, hasFilter){
 }
 function renderLegend(){
   const cos = companies.map(c=>`<span><i style="background:${esc(c.color)}"></i>${esc(c.name)}</span>`).join("");
-  $("#legend").innerHTML = `<div class="lrow">${cos}<span><i style="background:var(--surface-2);border:1px solid var(--line)"></i>Service room</span><span><i style="background:var(--reserved)"></i>Reserved, arriving later</span>${isCompany?`<span><i style="background:var(--surface-2);border:1px solid var(--line);background-image:repeating-linear-gradient(135deg,transparent 0 3px,rgba(0,0,0,.12) 3px 4px)"></i>Taken by another company</span>`:""}</div>
+  $("#legend").innerHTML = `<div class="lrow">${cos}<span><i style="background:var(--surface-2);border:1px solid var(--line)"></i>Service room</span>${isCompany?"":`<span><i style="background:var(--surface);border:1px solid var(--line);box-shadow:inset 0 3px 0 var(--accent)"></i>Top bar = company section</span>`}<span><i style="background:var(--reserved)"></i>Reserved, arriving later</span>${isCompany?`<span><i style="background:var(--surface-2);border:1px solid var(--line);background-image:repeating-linear-gradient(135deg,transparent 0 3px,rgba(0,0,0,.12) 3px 4px)"></i>Taken by another company</span>`:""}</div>
     <div class="lrow"><span class="dot"><i style="background:var(--free)"></i>Open, free room</span><span class="dot"><i style="background:var(--warn)"></i>Leaving in 1–2 days</span><span class="dot"><i style="background:var(--bad)"></i>Past departure date</span></div>`;
 }
 function rosterRows(){
@@ -792,6 +832,7 @@ function renderDrawer(){
         const notes=d.querySelector("#pNotes").value.trim(), shift=d.querySelector("#pShift").value;
         if (selectedBed){
           if(!freeBetween(selectedBed,arrive,depart)) throw new Error("That bed is taken for part of those dates.");
+          if(!confirmZone(selectedBed, company)) return;
           await db.insertStay({name,company,arrive,depart,notes,shift,bed:selectedBed,status:"assigned",assigned_at:new Date().toISOString()});
           toast(`${name} assigned to ${bedLabel(selectedBed)}`); drawerKind="bed";
         } else {
@@ -878,19 +919,21 @@ async function onBedClick(key){
   if (mode){
     const s=stays.find(x=>x.id===mode.stayId); if(!s){ mode=null; render(); return; }
     if (!freeBetween(key, s.arrive, s.depart)) return toast("That bed is taken during those dates.");
-    await assignToBed(s.id, key); mode=null; selectedBed=key; drawerKind="bed"; render(); return;
+    if (!(await assignToBed(s.id, key))) return; mode=null; selectedBed=key; drawerKind="bed"; render(); return;
   }
   selectedBed=key; drawerKind="bed"; render();
   if (window.innerWidth<=900) $("#drawer").scrollTop=0;
 }
 async function assignToBed(stayId, key){
-  const s=stays.find(x=>x.id===stayId); if(!s) return;
-  if (!freeBetween(key, s.arrive, s.depart)) return toast("That bed is taken during those dates.");
+  const s=stays.find(x=>x.id===stayId); if(!s) return false;
+  if (!freeBetween(key, s.arrive, s.depart)) { toast("That bed is taken during those dates."); return false; }
+  if (!confirmZone(key, s.company)) return false;
   try{
     await db.updateStay(stayId,{bed:key, status:"assigned", assigned_at:new Date().toISOString()});
     toast(`${s.name} → ${bedLabel(key)}`);
     if (s.company) await ensureCompany(s.company);
-  }catch(e){ toast("Could not assign: "+e.message); }
+    return true;
+  }catch(e){ toast("Could not assign: "+e.message); return false; }
 }
 async function checkOut(stayId){
   const s=stays.find(x=>x.id===stayId); if(!s) return;
@@ -904,14 +947,26 @@ async function declineRequest(stayId){
 }
 async function saveLayout(){
   if (editLayout.sections.some(s=>!s.name.trim()||s.rooms.some(r=>!r.name.trim()))) return toast("Every section and room needs a name.");
-  try{ await db.saveLayout(editLayout.sections); editing=false; editLayout=null; toast("Layout saved"); render(); }catch(e){ toast("Could not save layout: "+e.message); }
+  // a bed key is section/room/n, so rooms moved to another section take their stays (current and past) with them
+  const oldSec=new Map(); (layout?.sections||[]).forEach(s=>s.rooms.forEach(r=>oldSec.set(r.id,s.id)));
+  const rekey=[]; editLayout.sections.forEach(s=>s.rooms.forEach(r=>{ const o=oldSec.get(r.id); if(o && o!==s.id) stays.filter(x=>x.bed && x.bed.startsWith(`${o}/${r.id}/`)).forEach(x=>rekey.push({id:x.id, from:x.bed, to:`${s.id}/${r.id}/${x.bed.split("/")[2]}`})); }));
+  const done=[];
+  try{
+    for (const k of rekey){ const {error}=await sb.from("stays").update({bed:k.to}).eq("id",k.id); if(error) throw error; done.push(k); }
+    await db.saveLayout(editLayout.sections); editing=false; editLayout=null; toast("Layout saved"); render();
+  }catch(e){
+    for (const k of done){ await sb.from("stays").update({bed:k.from}).eq("id",k.id); } // put the beds back if the layout did not save
+    toast("Could not save layout: "+e.message);
+  }
 }
 
 $("#btnStarter").onclick=async()=>{
   const mk=(name,n,beds)=>({id:uid(),name,rooms:Array.from({length:n},(_,i)=>({id:uid(),name:`Room ${i+1}`,beds}))});
   try{ await db.saveLayout([mk("Section A",6,2), mk("Section B",4,2)]); toast("Starter layout created. Press Edit layout to make it match the camp."); }catch(e){ toast(e.message); }
 };
-$("#btnEditLayout").onclick=()=>{ if(mode||!layout) return; editing=true; editLayout=JSON.parse(JSON.stringify(layout)); closeDrawer(); render(); };
+$("#btnEditLayout").onclick=()=>{ if(mode||!layout) return; editing=true; editLayout=JSON.parse(JSON.stringify(layout));
+  editLayout.sections.forEach(s=>s.rooms.forEach(r=>{ if(!r.plan && PLAN_ALL.has(String(r.name).trim().toUpperCase())) r.plan=String(r.name).trim(); }));
+  closeDrawer(); render(); };
 $("#btnAddPerson").onclick=()=>{ if(mode||editing) return; selectedBed=null; drawerKind="add"; render(); };
 $("#fFrom").onchange=$("#fTo").onchange=()=>{ filter={from:$("#fFrom").value,to:$("#fTo").value}; render(); };
 $("#fClear").onclick=()=>{ filter={from:"",to:""}; $("#fFrom").value=""; $("#fTo").value=""; render(); };
@@ -1045,7 +1100,7 @@ function printPlan(){
   planOrder().forEach(x=>(groups[x.where]=groups[x.where]||[]).push(x));
   const rmCard=({sec,room})=>{ let inner=""; for(let i=1;i<=room.beds;i++){ const key=bedKey(sec.id,room.id,i); const {now,next}=bedInfo(key); const who=now||next; const col=who?companyColor(who.company):"#5a8f29";
       inner += who ? `<div class="rm" style="border-left-color:${esc(col)}"><div class="n"><span>${esc(room.name)}${room.beds>1?` · bed ${i}`:""}</span><span class="tag">${shiftText(who)}${now?"":" · reserved"}</span></div><div class="p">${esc(who.name)}</div><div class="m">${esc(who.company)}</div><div class="m">${fmt(who.arrive)} → ${fmt(who.depart)}${who.depart<t?" · OVERDUE":""}</div>${who.notes?`<div class="nt">${esc(who.notes)}</div>`:""}</div>`
-                   : `<div class="rm free"><div class="n"><span>${esc(room.name)}${room.beds>1?` · bed ${i}`:""}</span></div><div class="p">Free</div></div>`; } return inner; };
+                   : `<div class="rm free"><div class="n"><span>${esc(room.name)}${room.beds>1?` · bed ${i}`:""}</span></div><div class="p">Free</div>${sectionCompany(sec)?`<div class="m">${esc(sec.name)}</div>`:""}</div>`; } return inner; };
   let body = Object.entries(groups).map(([w,list])=>`<div class="sec">${esc(w)}</div><div class="grid">${list.map(rmCard).join("")}</div>`).join("");
   const rows=stays.filter(s=>s.status==="assigned").map(s=>({...s,room:roomNameOf(s.bed)})).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true}));
   body += `<div class="sec" style="break-before:page">${lang==="fr"?`Tout le monde au camp · ${rows.length} personnes · par chambre`:`Everyone in camp · ${rows.length} people · sorted by room`}</div><table><thead><tr><th>Room</th><th>Name</th><th>Company</th><th>Shift</th><th>Check in</th><th>Check out</th><th>Days left</th><th>Notes</th><th>Requested by</th></tr></thead><tbody>${rows.map(s=>`<tr><td>${esc(s.room)}</td><td><b>${esc(s.name)}</b></td><td>${esc(s.company)}</td><td>${shiftText(s)}</td><td>${fmt(s.arrive)}</td><td>${fmt(s.depart)}</td><td>${daysUntil(s.depart)}</td><td>${esc(s.notes||"")}</td><td>${esc(s.requester_email||"")}</td></tr>`).join("")}</tbody></table>`;
@@ -1167,11 +1222,13 @@ const FR = {
 "on a person sends an extension or date-change request to the camp coordinator, who approves or declines it, and you get an email either way. To add people, use":"sur une personne envoie une demande de prolongation ou de changement de dates au coordonnateur du camp, qui l'approuve ou la refuse; vous recevez un courriel dans les deux cas. Pour ajouter des gens, utilisez",
 "Set up the camp":"Configurer le camp","No rooms yet. Start from a small template and change the names, rooms and beds to match the real camp. You can edit the layout any time from the map.":"Aucune chambre pour l'instant. Partez d'un petit modèle et ajustez noms, chambres et lits au vrai camp. Le plan se modifie à tout moment depuis la carte.","Create the starter layout below.":"Créez le plan de départ ci-dessous.","Press":"Appuyez sur","on the map and fix section names, rooms and bed counts.":"sur le plan et corrigez les sections, chambres et nombres de lits.","Share this link with whoever puts in bed requests.":"Partagez ce lien avec ceux qui font des demandes de lits.","Create starter layout (2 sections)":"Créer le plan de départ (2 sections)",
 "Sent":"Envoyé","for":"pour","Confirmation and room details will go to":"La confirmation et la chambre seront envoyées à","once the camp admin assigns beds.":"une fois les lits assignés par l'administrateur.","This account is signed in but has no access to the board. Ask the camp admin.":"Ce compte est connecté mais n'a pas accès au tableau. Demandez à l'administrateur du camp.","Check your email for a reset link.":"Vérifiez vos courriels pour le lien de réinitialisation.","Type your email first.":"Entrez d'abord votre courriel.","What requesters can pick from. A company typed under \"Other\" stays on that request only until you add it here or assign that person to a bed.":"Ce que les demandeurs peuvent choisir. Une compagnie tapée sous « Autre » reste sur cette demande seulement, jusqu'à ce que vous l'ajoutiez ici ou assigniez la personne à un lit.",
+"Name sections after companies and pick the company, move rooms between sections, rename rooms, change bed counts. Rooms with people in them cannot be removed.":"Nommez les sections d'après les compagnies et choisissez la compagnie, déplacez des chambres entre les sections, renommez des chambres, changez le nombre de lits. Les chambres occupées ne peuvent pas être retirées.",
+"No company":"Aucune compagnie","Company for this section":"Compagnie de cette section","Move to section":"Déplacer vers la section","Position on the drawing":"Position sur le dessin","Top bar = company section":"Barre du haut = section de compagnie",
 "Rename sections and rooms, change bed counts, add or remove rooms. Rooms with people in them cannot be removed.":"Renommez les sections et chambres, changez le nombre de lits, ajoutez ou retirez des chambres. Les chambres occupées ne peuvent pas être retirées.",
 };
 const FR_RX = [
   [/^(\d+) free of (\d+)$/, "$1 libres sur $2"], [/^beds free now · of (\d+)$/, "lits libres · sur $1"], [/^Sent (.+) for$/, "Envoyé le $1 pour"], [/^(\d+) of (\d+)$/, "$1 sur $2"], [/^(\d+) days? left$/, "$1 jours restants"], [/^(\d+) days? overdue$/, "$1 jours de retard"],
-  [/^\((\d+) days? left\)$/, "($1 jours restants)"], [/^\((\d+) days? overdue\)$/, "($1 jours de retard)"], [/^Person (\d+)$/, "Personne $1"], [/^(\d+) (bed|beds)$/, "$1 lits"], [/^Room (.+)$/, "Chambre $1"],
+  [/^\((\d+) days? left\)$/, "($1 jours restants)"], [/^\((\d+) days? overdue\)$/, "($1 jours de retard)"], [/^Person (\d+)$/, "Personne $1"], [/^(\d+) (bed|beds)$/, "$1 lits"], [/^(\d+) (room|rooms)$/, "$1 chambres"], [/^(.+) section$/, "section $1"], [/^Room (.+)$/, "Chambre $1"],
   [/^Signed in as (.+) \(admin, can change the board\)\.$/, "Connecté en tant que $1 (admin, peut modifier le tableau)."], [/^Signed in as (.+) \(viewer, read only\)\.$/, "Connecté en tant que $1 (lecture seulement)."], [/^Signed in as (.+) \(company portal for (.+), sees its own people only\)\.$/, "Connecté en tant que $1 (portail de $2, voit ses propres gens seulement)."],
   [/^Requesting for (.+)\. The confirmation goes to the email below\.$/, "Demande pour $1. La confirmation ira au courriel ci-dessous."], [/^Request beds for (.+)$/, "Demander des lits pour $1"], [/^Reserved by another company until (.+)\.$/, "Réservé par une autre compagnie jusqu'au $1."],
   [/^Taken by another company until (.+)\.$/, "Occupé par une autre compagnie jusqu'au $1."], [/^Next in this bed: (.+) from (.+)\.$/, "Prochain dans ce lit : $1 à partir du $2."], [/^Requested by (.+)\.$/, "Demandé par $1."],
